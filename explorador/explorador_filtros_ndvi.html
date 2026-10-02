@@ -1,0 +1,1293 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Explorador de filtros ΔNDVI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#E7EAE6; --panel:#F5F6F3; --ink:#1E2B2F; --muted:#627277; --line:#C8D0CB;
+  --det:#B03A2E; --tp:#3E7B53; --fn:#C28A2C; --sel:#2F5D73; --drop:#8A9590;
+  --sans:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --cond:"Barlow Semi Condensed","Barlow",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--paper);color:var(--ink);font:15px/1.45 var(--sans)}
+button,input,select{font:inherit;color:inherit}
+header{display:flex;align-items:center;gap:20px;padding:12px 20px;border-bottom:1px solid var(--line);background:var(--panel)}
+header h1{font:600 22px/1.1 var(--cond);margin:0}
+header p{margin:2px 0 0;color:var(--muted);font-size:13.5px}
+.grow{flex:1}
+#refcheck{font-size:13px;color:var(--muted);max-width:420px;text-align:right}
+#refcheck.ok{color:var(--tp)} #refcheck.bad{color:var(--det)}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border:1px solid var(--ink);border-radius:4px;background:var(--ink);color:var(--panel);cursor:pointer;font-weight:500;font-size:14px}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+.btn:focus-visible,input:focus-visible,select:focus-visible,.card:focus-visible{outline:2px solid var(--sel);outline-offset:2px}
+
+main{display:grid;grid-template-columns:350px 1fr 360px;height:calc(100vh - 62px)}
+main.empty>aside,main.empty>#mapcol,main.empty~#valid{display:none}
+#valid{border-top:1px solid var(--line);background:var(--panel);padding:18px 20px 40px}
+.vhead{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:12px}
+.vhead h2{font:600 20px/1.2 var(--cond);margin:0}
+.vcounts{display:flex;gap:12px;font-size:13.5px;font-variant-numeric:tabular-nums}
+.vcounts span{display:flex;align-items:center;gap:5px}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+.st-Confirmado{background:#3E7B53}.st-Descartado{background:#B03A2E}.st-Dudoso{background:#C28A2C}.st-Pendiente{background:#B5BDB8}
+.vbody{display:grid;grid-template-columns:minmax(300px,370px) minmax(0,1fr) 290px;gap:20px;align-items:start}
+.vprog{display:flex;width:220px;height:7px;border-radius:4px;overflow:hidden;background:#DDE2DE}
+.vprog i{display:block;height:100%}
+.ortho{position:relative;aspect-ratio:1;overflow:hidden;border:1px solid var(--line);background:#CDD3CF}
+.ortho svg{position:absolute;inset:0;width:100%;height:100%}
+.ortho .osb{position:absolute;left:8px;bottom:8px;background:rgba(245,246,243,.9);border-radius:3px;padding:3px 7px 2px;font-size:11px}
+.ortho .osb div{height:5px;border:1.5px solid var(--ink);border-top:0;margin-bottom:2px}
+.vloc h3{font:600 15px/1.2 var(--cond);margin:0 0 8px}
+.vloc figure{margin:0 0 14px}
+.vloc svg{display:block;width:100%;height:auto;border:1px solid var(--line);background:#CDD3CF}
+.vloc figcaption{font-size:12.5px;color:var(--muted);margin-top:4px;display:flex;justify-content:space-between}
+.l-dep{fill:none;stroke:#fff;stroke-width:1.8;vector-effect:non-scaling-stroke}
+.l-mun{fill:none;stroke:#fff;stroke-opacity:.45;stroke-width:.6;vector-effect:non-scaling-stroke}
+.l-sel{fill:#F2D24B;fill-opacity:.55;stroke:#F2D24B;stroke-width:1.6;vector-effect:non-scaling-stroke}
+.l-mpio{fill:none;stroke:#F2D24B;stroke-width:2;vector-effect:non-scaling-stroke}
+.l-halo{fill:none;stroke:#1E2B2F;stroke-opacity:.55;stroke-width:4;vector-effect:non-scaling-stroke}
+.l-aoi{fill:none;stroke:#fff;stroke-width:1.3;stroke-dasharray:5 3;vector-effect:non-scaling-stroke}
+.l-ring{fill:none;stroke:#fff;stroke-width:2;vector-effect:non-scaling-stroke}
+.vlist{max-height:620px;overflow-y:auto;border:1px solid var(--line);border-radius:5px;background:#fff}
+.vlist th{position:sticky;top:0;background:#fff;cursor:pointer;user-select:none}
+.vlist tr{cursor:pointer}.vlist tbody tr:hover{background:#F0F3F1}
+.vlist tr.sel{background:#E4ECEA;box-shadow:inset 3px 0 0 var(--sel)}
+.vtitle{font:600 18px/1.2 var(--cond);margin-bottom:8px}
+.vpanels{display:grid;grid-template-columns:1.7fr 1fr 1fr;gap:10px}
+.vpanels figure.big{grid-row:span 2}
+.vpanels figure{margin:0}.vpanels canvas{width:100%;aspect-ratio:1;display:block;image-rendering:pixelated;border:1px solid var(--line);background:#D9DED9}
+.vpanels figcaption{font-size:12.5px;color:var(--muted);margin-top:3px}
+.vinfo{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:13.5px;margin:12px 0;font-variant-numeric:tabular-nums}
+.vinfo span b{font-weight:600}
+.vactions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.vactions .btn{padding:7px 14px}
+.b-conf{background:#3E7B53;border-color:#3E7B53}.b-desc{background:#B03A2E;border-color:#B03A2E}.b-dud{background:#C28A2C;border-color:#C28A2C}
+.vactions input[type=text]{flex:1;min-width:180px;padding:6px 9px;border:1px solid var(--line);border-radius:4px;background:#fff}
+kbd{font:500 11px/1 var(--sans);border:1px solid rgba(255,255,255,.5);border-radius:3px;padding:1px 4px;margin-left:4px}
+.btn.ghost kbd{border-color:var(--line)}
+@media (max-width:1450px){.vbody{grid-template-columns:minmax(280px,340px) minmax(0,1fr)}.vloc{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:16px}}
+@media (max-width:1150px){.vbody{grid-template-columns:1fr}.vpanels{grid-template-columns:1fr 1fr}.vpanels figure.big{grid-column:1/-1;grid-row:auto}}
+main:not(.empty) #drop{display:none}
+#drop{grid-column:1/-1;display:grid;place-items:center;padding:40px}
+#drop .box{max-width:520px;border:1.5px dashed var(--drop);border-radius:8px;padding:36px 40px;background:var(--panel)}
+#drop.hover .box{border-color:var(--sel);background:#EEF2F2}
+#drop h2{font:600 24px/1.2 var(--cond);margin:0 0 10px}
+#drop p{margin:0 0 10px;color:var(--muted)}
+#drop code{font-size:13px;background:var(--paper);padding:1px 5px;border-radius:3px;color:var(--ink)}
+
+aside{overflow-y:auto;padding:16px 18px 30px;background:var(--panel)}
+#left{border-right:1px solid var(--line)}
+#right{border-left:1px solid var(--line)}
+h2.sec{font:600 16px/1.2 var(--cond);margin:18px 0 8px}
+h2.sec:first-child{margin-top:0}
+.hint{color:var(--muted);font-size:13px;margin:0 0 8px}
+
+/* Umbral base */
+#baseCards{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.card{border:1px solid var(--line);border-radius:5px;padding:8px 9px;background:#fff;cursor:pointer;text-align:left}
+.card.active{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.card b{font:700 19px/1 var(--cond);display:block;margin-bottom:5px}
+.card .kv{display:flex;justify-content:space-between;gap:6px;font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.card .kv span:last-child{color:var(--ink)}
+.custom{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13.5px;color:var(--muted)}
+.custom input{width:64px;padding:3px 6px;border:1px solid var(--line);border-radius:4px;background:#fff}
+
+/* Pila de filtros */
+#stack{list-style:none;margin:0;padding:0;counter-reset:st}
+.step{position:relative;padding:10px 0 12px 30px;border-top:1px solid var(--line)}
+.step::before{counter-increment:st;content:counter(st);position:absolute;left:0;top:11px;width:20px;height:20px;border-radius:50%;border:1px solid var(--line);font:600 12px/18px var(--cond);text-align:center;color:var(--muted)}
+.step.base::before{content:"0";counter-increment:none}
+.step.off{opacity:.55}
+.step .row{display:flex;align-items:center;gap:8px}
+.step .name{font-weight:600;flex:1}
+.step .desc{font-size:12.5px;color:var(--muted);margin:1px 0 6px}
+.sw{position:relative;width:34px;height:19px;flex:none}
+.sw input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer}
+.sw i{position:absolute;inset:0;border-radius:10px;background:#BFC7C3;transition:background .15s}
+.sw i::after{content:"";position:absolute;left:2px;top:2px;width:15px;height:15px;border-radius:50%;background:#fff;transition:transform .15s}
+.sw input:checked+i{background:var(--ink)}
+.sw input:checked+i::after{transform:translateX(15px)}
+.sw input:focus-visible+i{outline:2px solid var(--sel);outline-offset:2px}
+.param{display:flex;align-items:center;gap:8px;font-size:13.5px;flex-wrap:wrap}
+.param input[type=range]{flex:1;min-width:110px;accent-color:var(--ink)}
+.param select,.param input[type=number]{padding:2px 5px;border:1px solid var(--line);border-radius:4px;background:#fff}
+.param input[type=number]{width:58px}
+.param .val{font-variant-numeric:tabular-nums;min-width:52px;text-align:right;font-weight:500}
+.param label.chk{display:flex;align-items:center;gap:4px}
+.bar{height:6px;background:#DDE2DE;border-radius:3px;margin:8px 0 4px;overflow:hidden}
+.bar span{display:block;height:100%;background:var(--det);transition:width .2s}
+.nums{display:flex;gap:12px;font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums;flex-wrap:wrap}
+.nums b{color:var(--ink);font-weight:600}
+.up{color:var(--tp)} .down{color:var(--det)}
+.note{font-size:12px;color:var(--fn);margin-top:3px}
+
+/* Mapa */
+#mapcol{display:flex;flex-direction:column;min-width:0}
+.toolbar{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:9px 14px;border-bottom:1px solid var(--line);font-size:13.5px;background:var(--panel)}
+.toolbar select{padding:3px 6px;border:1px solid var(--line);border-radius:4px;background:#fff}
+.toolbar label{display:flex;align-items:center;gap:5px}
+.sw-c{display:inline-block;width:11px;height:11px;border-radius:2px}
+#viewport{position:relative;flex:1;overflow:hidden;cursor:grab;background:#D9DED9}
+#viewport.drag{cursor:grabbing}
+#stage{position:absolute;left:0;top:0;transform-origin:0 0}
+#stage>*{position:absolute;left:0;top:0}
+#base,#map{image-rendering:pixelated;image-rendering:crisp-edges}
+#tiles img,#tilesD img,.ortho img{position:absolute;max-width:none;user-select:none;pointer-events:none;-webkit-user-drag:none}
+#vec{overflow:visible;pointer-events:none}
+#vec path{vector-effect:none}
+#vec .v-water{stroke-width:calc(var(--sw,1px) * 1)}
+#vec .v-ww{stroke-width:calc(var(--sw,1px) * 1.6)}
+#vec .v-bld{stroke-width:calc(var(--sw,1px) * .7)}
+.v-water{fill:#3F86B4;fill-opacity:.55;stroke:#2B6A93;stroke-width:1;vector-effect:non-scaling-stroke;fill-rule:evenodd}
+.v-ww{fill:none;stroke:#5AA6D8;stroke-width:1.5;vector-effect:non-scaling-stroke;stroke-linecap:round;stroke-linejoin:round}
+.v-bld{fill:#F4EEE3;fill-opacity:.92;stroke:#2E2C28;stroke-width:.7;vector-effect:non-scaling-stroke;fill-rule:evenodd}
+.v-cand{fill:none;stroke:#F2D24B;stroke-width:2.2;vector-effect:non-scaling-stroke;fill-rule:evenodd}
+.v-inv{fill:none;stroke:#50D7E6;stroke-width:1.6;stroke-dasharray:4 3;vector-effect:non-scaling-stroke}
+.mapov{position:absolute;pointer-events:none;background:rgba(245,246,243,.9);border-radius:3px;font-size:11.5px;color:var(--ink);font-variant-numeric:tabular-nums}
+#scalebar{left:12px;bottom:12px;padding:4px 8px 3px}
+#scalebar .sb{height:6px;border:1.5px solid var(--ink);border-top:0;margin-bottom:2px}
+#north{right:12px;top:12px;padding:4px 6px;text-align:center;font:600 11px/1 var(--cond)}
+#attrib{right:0;bottom:0;border-radius:3px 0 0 0;padding:2px 6px;font-size:10.5px;color:var(--muted)}
+.mapfoot #coord{margin-left:auto;font-variant-numeric:tabular-nums}
+.sw-l{display:inline-block;width:14px;height:0;border-top:2px solid #5AA6D8}
+#tip{position:fixed;pointer-events:none;background:rgba(30,43,47,.94);color:#F5F6F3;font-size:12.5px;padding:7px 10px;border-radius:4px;display:none;z-index:10;font-variant-numeric:tabular-nums;line-height:1.5;max-width:260px}
+#tip b{color:#fff}
+.mapfoot{padding:6px 14px;font-size:12.5px;color:var(--muted);border-top:1px solid var(--line);background:var(--panel);display:flex;gap:16px}
+
+/* Métricas */
+.headline{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:4px 12px;align-items:end}
+.big{font:700 44px/1 var(--cond);font-variant-numeric:tabular-nums}
+.mid{font:600 26px/1 var(--cond);font-variant-numeric:tabular-nums}
+.lab{font-size:12.5px;color:var(--muted)}
+.dl{display:grid;grid-template-columns:1fr auto;gap:3px 10px;font-size:13.5px;margin-top:12px;font-variant-numeric:tabular-nums}
+.dl dt{color:var(--muted)} .dl dd{margin:0;text-align:right}
+#chart{width:100%;height:auto;display:block}
+table{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums}
+th{font-weight:600;text-align:right;color:var(--muted);padding:4px 3px;border-bottom:1px solid var(--line)}
+td{padding:5px 3px;border-bottom:1px solid #E0E5E1;text-align:right;vertical-align:top}
+th:first-child,td:first-child{text-align:left}
+td.cfg{font-size:12px;line-height:1.3}
+tr.best td{font-weight:600}
+td .x{border:0;background:none;color:var(--muted);cursor:pointer;padding:0 2px}
+#fnList{list-style:none;margin:0;padding:0;max-height:260px;overflow-y:auto;font-size:13px;font-variant-numeric:tabular-nums}
+#fnList li{display:flex;justify-content:space-between;padding:4px 6px;border-bottom:1px solid #E0E5E1;cursor:pointer}
+#fnList li:hover,#fnList li.sel{background:#E9EEEC}
+#fnList li.sel{box-shadow:inset 3px 0 0 var(--sel)}
+@media (max-width:1150px){main{grid-template-columns:1fr;height:auto}#mapcol{height:75vh}#left,#right{border:0}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1 id="ttl">Explorador de filtros ΔNDVI</h1>
+    <p id="sub">Umbral base, filtros y validación por evento contra el inventario</p>
+  </div>
+  <div class="grow"></div>
+  <div id="refcheck"></div>
+  <label class="btn">Abrir capas<input id="file" type="file" accept=".json" hidden></label>
+</header>
+
+<main id="app" class="empty">
+  <section id="drop">
+    <div class="box">
+      <h2>Carga las capas de un sitio</h2>
+      <p>Corre la celda <code>17 - Exportar capas</code> al final del notebook y arrastra aquí el <code>capas_explorador_*.json</code> que genera, o usa el botón Abrir capas.</p>
+      <p>Todo se calcula en este navegador; nada sale de tu equipo.</p>
+      <p id="loadmsg"></p>
+    </div>
+  </section>
+
+  <aside id="left">
+    <h2 class="sec">Umbral base ΔNDVI</h2>
+    <p class="hint">Lo que detecta cada percentil sin filtros. Elige uno como base de la pila.</p>
+    <div id="baseCards"></div>
+    <div class="custom">Otro percentil <input id="customP" type="number" min="50" max="99.9" step="0.5"> <button class="btn ghost" id="customGo" style="padding:3px 10px">Usar</button></div>
+    <h2 class="sec">Filtros</h2>
+    <p class="hint">Se aplican en este orden. Los percentiles se calculan sobre lo que llega a cada paso.</p>
+    <ol id="stack"></ol>
+  </aside>
+
+  <section id="mapcol">
+    <div class="toolbar">
+      <label>Fondo
+        <select id="bg">
+          <option value="ortho_hs">Ortofoto + hillshade</option>
+          <option value="ortho">Ortofoto (Esri)</option>
+          <option value="hillshade">Hillshade (×1.5)</option>
+          <option value="ndvi">ΔNDVI</option>
+          <option value="rgb_pre">RGB pre</option>
+          <option value="rgb_post">RGB post</option>
+          <option value="slope">Pendiente</option>
+          <option value="curv">Curvatura</option>
+        </select>
+      </label>
+      <label><input type="checkbox" id="lyDet" checked><span class="sw-c" style="background:var(--det)"></span>Detección</label>
+      <label><input type="checkbox" id="lyDrop"><span class="sw-c" style="background:var(--drop)"></span>Descartados por filtros</label>
+      <label><input type="checkbox" id="lyWater" checked><span class="sw-c" style="background:#3F86B4"></span>Drenajes</label>
+      <label><input type="checkbox" id="lyBld" checked><span class="sw-c" style="background:#F4EEE3;border:1px solid #2E2C28"></span>Edificios</label>
+      <label><input type="checkbox" id="lyInv" checked><span class="sw-c" style="background:var(--tp)"></span>TP <span class="sw-c" style="background:var(--fn)"></span>FN</label>
+      <div class="grow"></div>
+      <button class="btn ghost" id="fit" style="padding:3px 10px">Encuadrar</button>
+    </div>
+    <div id="viewport">
+      <div id="stage"><div id="tiles"></div><div id="tilesD"></div><canvas id="base"></canvas><svg id="vec"></svg><canvas id="map"></canvas></div>
+      <div id="scalebar" class="mapov"><div class="sb"></div><span></span></div>
+      <div id="north" class="mapov"><svg width="14" height="18" viewBox="0 0 14 18" aria-hidden="true"><path d="M7 0 L13 17 L7 13 L1 17 Z" fill="#1E2B2F"/><path d="M7 0 L7 13 L1 17 Z" fill="#8A9590"/></svg><br>N</div>
+      <div id="attrib" class="mapov" hidden>Ortofoto: Esri, Maxar, Earthstar Geographics</div>
+    </div>
+    <div class="mapfoot"><span>Rueda para zoom, arrastra para mover, pasa el cursor para ver valores del píxel, clic en un candidato para validarlo.</span><span id="coord"></span></div>
+  </section>
+
+  <aside id="right">
+    <h2 class="sec">Resultado de la pila</h2>
+    <div class="headline">
+      <div><div class="big" id="mF1">–</div><div class="lab">F1 por evento</div></div>
+      <div><div class="mid" id="mR">–</div><div class="lab">Recall</div></div>
+      <div><div class="mid" id="mP">–</div><div class="lab">Precisión</div></div>
+    </div>
+    <dl class="dl">
+      <dt>Eventos detectados</dt><dd id="mTP">–</dd>
+      <dt>Eventos no detectados (FN)</dt><dd id="mFN">–</dd>
+      <dt>Píxeles detectados</dt><dd id="mPx">–</dd>
+      <dt>Píxeles fuera del inventario</dt><dd id="mFPpx">–</dd>
+      <dt>FP equivalentes en eventos</dt><dd id="mFPev">–</dd>
+      <dt>F1 por píxel</dt><dd id="mF1px">–</dd>
+      <dt id="mClLab" hidden>Clusters DBSCAN</dt><dd id="mCl" hidden>–</dd>
+    </dl>
+
+    <h2 class="sec">Métricas por paso</h2>
+    <svg id="chart" viewBox="0 0 320 170" role="img" aria-label="Recall, precisión y F1 por paso de la pila"></svg>
+
+    <h2 class="sec">Configuraciones guardadas</h2>
+    <button class="btn ghost" id="snap" style="padding:4px 12px">Guardar configuración actual</button>
+    <table id="snaps" style="margin-top:8px"><thead><tr><th>Configuración</th><th>px</th><th>TP</th><th>R</th><th>P</th><th>F1</th><th></th></tr></thead><tbody></tbody></table>
+
+    <h2 class="sec" id="fnTitle">Eventos no detectados</h2>
+    <p class="hint">Ordenados por área. Clic para ubicarlo en el mapa.</p>
+    <ul id="fnList"></ul>
+  </aside>
+</main>
+<section id="valid">
+  <div class="vhead">
+    <h2>Validación de candidatos</h2>
+    <div class="vcounts" id="vcounts"></div>
+    <div class="vprog" id="vprog" title="Avance de la validación"></div>
+    <div class="grow"></div>
+    <label style="font-size:13.5px;display:flex;gap:5px;align-items:center"><input type="checkbox" id="vInv">Mostrar inventario en los recortes</label>
+    <button class="btn ghost" id="vCsv">Exportar CSV</button>
+    <button class="btn" id="vGeo">Exportar GeoJSON</button>
+  </div>
+  <p class="hint" id="vsub"></p>
+  <div class="vbody">
+    <div class="vlist"><table id="vtable"><thead><tr>
+      <th data-k="rank">#</th><th data-k="area_ha">Área (ha)</th><th data-k="ndvi_mean">ΔNDVI</th><th data-k="slope_mean">Pend.</th><th data-k="susc_dom">Susc.</th><th data-k="estado">Estado</th>
+    </tr></thead><tbody></tbody></table></div>
+    <div class="vview">
+      <div class="vtitle" id="vtitle">Sin candidatos</div>
+      <div class="vpanels">
+        <figure class="big"><div class="ortho" id="vOrtho"></div><figcaption>Ortofoto Esri (fecha de la imagen variable)</figcaption></figure>
+        <figure><canvas id="vc0"></canvas><figcaption id="vf0">RGB pre</figcaption></figure>
+        <figure><canvas id="vc1"></canvas><figcaption id="vf1">RGB post</figcaption></figure>
+        <figure><canvas id="vc2"></canvas><figcaption>ΔNDVI</figcaption></figure>
+        <figure><canvas id="vc3"></canvas><figcaption id="vf3">Hillshade</figcaption></figure>
+      </div>
+      <div class="vinfo" id="vinfo"></div>
+      <div class="vactions">
+        <button class="btn ghost" id="vPrev">← Anterior</button>
+        <button class="btn b-conf" data-st="Confirmado">Confirmar<kbd>C</kbd></button>
+        <button class="btn b-desc" data-st="Descartado">Descartar<kbd>D</kbd></button>
+        <button class="btn b-dud" data-st="Dudoso">Dudoso<kbd>U</kbd></button>
+        <button class="btn ghost" id="vNext">Siguiente →</button>
+        <input type="text" id="vNota" placeholder="Nota (opcional)">
+      </div>
+    </div>
+    <div class="vloc">
+      <figure><h3>Ubicación</h3><svg id="locDep"></svg><figcaption><span>Antioquia</span><span id="locMpioName"></span></figcaption></figure>
+      <figure><svg id="locMpio"></svg><figcaption><span id="locMpioName2"></span><span>— área de análisis</span></figcaption></figure>
+    </div>
+  </div>
+</section>
+<div id="tip"></div>
+
+<script id="engine">
+/* ─── Motor de cálculo: reproduce la lógica del notebook ─── */
+(function(root){
+  function decode(L){
+    const bin = atob(L.b64), u8 = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    switch (L.dtype){
+      case 'float32': return new Float32Array(u8.buffer);
+      case 'float64': return new Float64Array(u8.buffer);
+      case 'int32':   return new Int32Array(u8.buffer);
+      case 'uint8':   return u8;
+      default: throw new Error('dtype no soportado: ' + L.dtype);
+    }
+  }
+  // np.percentile (método lineal) sobre un arreglo ya ordenado
+  function percentile(s, p){
+    const n = s.length; if (!n) return NaN;
+    const pos = (p / 100) * (n - 1), lo = Math.floor(pos), hi = Math.ceil(pos);
+    return s[lo] + (s[hi] - s[lo]) * (pos - lo);
+  }
+  function sortedValid(arr, mask){
+    let c = 0; const n = arr.length;
+    for (let i = 0; i < n; i++) if ((!mask || mask[i]) && !Number.isNaN(arr[i])) c++;
+    const out = new Float64Array(c); let k = 0;
+    for (let i = 0; i < n; i++){ const v = arr[i]; if ((!mask || mask[i]) && !Number.isNaN(v)) out[k++] = v; }
+    return out.sort();
+  }
+  function prepare(data){
+    const L = data.layers, M = data.meta, D = {meta: M};
+    D.h = M.shape[0]; D.w = M.shape[1]; D.n = D.h * D.w;
+    for (const k of ['ndvi','bsi','slope','curv','susc_bits','rgb_pre','rgb_post','inv_idx','inv_off']) D[k] = decode(L[k]);
+    D.dem = L.dem ? decode(L.dem) : null;
+    D.nEv = D.inv_off.length - 1;
+    D.inv = new Uint8Array(D.n);
+    for (let i = 0; i < D.inv_idx.length; i++) D.inv[D.inv_idx[i]] = 1;
+    let s = 0; for (let i = 0; i < D.n; i++) s += D.inv[i]; D.invPx = s;
+    D.ndviSorted = sortedValid(D.ndvi, null);
+    D.evCentroid = [];
+    for (let e = 0; e < D.nEv; e++){
+      let r = 0, c = 0; const a = D.inv_off[e], b = D.inv_off[e+1];
+      for (let k = a; k < b; k++){ const q = D.inv_idx[k]; r += Math.floor(q / D.w); c += q % D.w; }
+      D.evCentroid.push([r / Math.max(b - a, 1), c / Math.max(b - a, 1)]);
+    }
+    return D;
+  }
+  // Igual a metricas_por_evento() del notebook
+  function metrics(D, m){
+    let TP = 0; const tp = new Uint8Array(D.nEv);
+    for (let e = 0; e < D.nEv; e++){
+      for (let k = D.inv_off[e]; k < D.inv_off[e+1]; k++) if (m[D.inv_idx[k]]){ tp[e] = 1; TP++; break; }
+    }
+    let px = 0, fpPx = 0, tpPx = 0;
+    for (let i = 0; i < D.n; i++) if (m[i]){ px++; if (D.inv[i]) tpPx++; else fpPx++; }
+    const FN = D.nEv - TP;
+    const areaMedia = D.invPx / Math.max(D.nEv, 1);
+    const FPev = Math.trunc(fpPx / Math.max(areaMedia, 1));
+    const P = TP / (TP + FPev + 1e-10), R = TP / (TP + FN + 1e-10), F1 = 2*P*R / (P + R + 1e-10);
+    const Pp = tpPx / (tpPx + fpPx + 1e-10), Rp = tpPx / (D.invPx + 1e-10), F1p = 2*Pp*Rp / (Pp + Rp + 1e-10);
+    return {px, TP, FN, fpPx, FPev, P, R, F1, F1p, tp};
+  }
+  function dbscan(D, m, eps, minPts){
+    const {w, h, n} = D, r = Math.floor(eps), offs = [];
+    for (let dr = -r; dr <= r; dr++) for (let dc = -r; dc <= r; dc++) if (dr*dr + dc*dc <= eps*eps) offs.push([dr, dc]);
+    const core = new Uint8Array(n);
+    for (let i = 0; i < n; i++){
+      if (!m[i]) continue;
+      const y = Math.floor(i / w), x = i % w; let c = 0;
+      for (const [dr, dc] of offs){ const yy = y+dr, xx = x+dc; if (yy>=0 && yy<h && xx>=0 && xx<w && m[yy*w+xx]) c++; }
+      if (c >= minPts) core[i] = 1;
+    }
+    const out = new Uint8Array(n), lab = new Int32Array(n).fill(-1); let nCl = 0;
+    const stack = [];
+    for (let i = 0; i < n; i++){
+      if (!core[i] || lab[i] >= 0) continue;
+      lab[i] = nCl; stack.push(i);
+      while (stack.length){
+        const j = stack.pop(); out[j] = 1;
+        const y = Math.floor(j / w), x = j % w;
+        for (const [dr, dc] of offs){
+          const yy = y+dr, xx = x+dc; if (yy<0 || yy>=h || xx<0 || xx>=w) continue;
+          const q = yy*w + xx; if (!m[q]) continue;
+          out[q] = 1;
+          if (lab[q] < 0){ lab[q] = nCl; if (core[q]) stack.push(q); }
+        }
+      }
+      nCl++;
+    }
+    return {mask: out, nClusters: nCl, labels: lab};
+  }
+  function and(a, f){ const o = new Uint8Array(a.length); for (let i = 0; i < a.length; i++) o[i] = a[i] && f(i) ? 1 : 0; return o; }
+
+  // cfg: {base, bsi:{on,p}, slope:{on,t}, curv:{on,p}, susc:{on,levels[]}, ndviFinal:{on,p}, dbscan:{on,eps,min}}
+  function run(D, cfg){
+    const st = [];
+    const tN = percentile(D.ndviSorted, cfg.base);
+    let m = new Uint8Array(D.n);
+    for (let i = 0; i < D.n; i++) m[i] = D.ndvi[i] > tN ? 1 : 0;
+    st.push({key:'ndvi', thr:tN, mask:m});
+    if (cfg.bsi.on){
+      const t = cfg.bsi.p === 0 ? 0 : percentile(sortedValid(D.bsi, m), cfg.bsi.p);
+      m = and(m, i => D.bsi[i] > t); st.push({key:'bsi', thr:t, mask:m});
+    }
+    if (cfg.slope.on){
+      const t = cfg.slope.t; m = and(m, i => D.slope[i] > t); st.push({key:'slope', thr:t, mask:m});
+    }
+    if (cfg.curv.on){
+      const s = sortedValid(D.curv, m), t = percentile(s, cfg.curv.p);
+      if (s.length) m = and(m, i => D.curv[i] <= t);
+      st.push({key:'curv', thr:t, mask:m});
+    }
+    if (cfg.susc.on){
+      let bits = 0; for (const lv of cfg.susc.levels){ const b = D.meta.niveles_susc.indexOf(lv); if (b >= 0) bits |= (1 << b); }
+      m = and(m, i => (D.susc_bits[i] & bits) !== 0); st.push({key:'susc', thr:bits, mask:m});
+    }
+    if (cfg.ndviFinal.on){
+      const s = sortedValid(D.ndvi, m), t = percentile(s, cfg.ndviFinal.p);
+      if (s.length) m = and(m, i => D.ndvi[i] > t);
+      st.push({key:'ndviFinal', thr:t, mask:m});
+    }
+    if (cfg.dbscan.on){
+      const r = dbscan(D, m, cfg.dbscan.eps, cfg.dbscan.min);
+      m = r.mask; st.push({key:'dbscan', thr:r.nClusters, mask:m, nClusters:r.nClusters});
+    }
+    for (const s of st) s.m = metrics(D, s.mask);
+    return st;
+  }
+  function defaultCfg(M){
+    const d = M.defaults;
+    return {
+      base: d.pct_ndvi,
+      bsi: {on:true, p:d.pct_bsi},
+      slope: {on:true, t:d.slope},
+      curv: {on:true, p:d.curv_pct},
+      susc: {on:true, levels:d.susc.slice()},
+      ndviFinal: {on:false, p:d.pct_ndvi_final > 0 ? d.pct_ndvi_final : 95},
+      dbscan: {on:false, eps:d.dbscan_eps, min:d.dbscan_min},
+    };
+  }
+  // Candidatos = clusters DBSCAN sobre la máscara final (como la celda 13)
+  function clusters(D, m, eps, minPts){
+    const r = dbscan(D, m, eps, minPts), L = r.labels, M = D.meta, w = D.w, h = D.h;
+    const [lonMin, latMin, lonMax, latMax] = M.bounds, pxLon = (lonMax - lonMin) / w, pxLat = (latMax - latMin) / h;
+    const list = Array.from({length: r.nClusters}, (_, id) => ({id, px: []}));
+    for (let i = 0; i < D.n; i++) if (L[i] >= 0) list[L[i]].px.push(i);
+    const NIV = M.niveles_susc;
+    for (const c of list){
+      let sr = 0, sc = 0, r0 = h, r1 = 0, c0 = w, c1 = 0, sn = 0, nn = 0, mx = -Infinity, ss = 0, ns = 0, per = 0, inv = 0;
+      const pri = [];
+      for (const i of c.px){
+        const y = Math.floor(i / w), x = i % w;
+        sr += y; sc += x; if (y < r0) r0 = y; if (y > r1) r1 = y; if (x < c0) c0 = x; if (x > c1) c1 = x;
+        const v = D.ndvi[i]; if (!Number.isNaN(v)){ sn += v; nn++; if (v > mx) mx = v; }
+        const sl = D.slope[i]; if (!Number.isNaN(sl)){ ss += sl; ns++; }
+        const b = D.susc_bits[i]; if (b){ let k = 0; while (!(b & (1 << k))) k++; pri.push(5 - k); }
+        if (D.inv[i]) inv = 1;
+        for (const [dy, dx] of [[-1,0],[1,0],[0,-1],[0,1]]){
+          const yy = y + dy, xx = x + dx;
+          if (yy < 0 || yy >= h || xx < 0 || xx >= w || L[yy*w + xx] !== c.id) per++;
+        }
+      }
+      const n = c.px.length;
+      pri.sort((a, b) => a - b);
+      const med = pri.length ? (pri.length % 2 ? pri[(pri.length-1)/2] : (pri[pri.length/2-1] + pri[pri.length/2]) / 2) : 0;
+      Object.assign(c, {
+        seed: c.px[0], n_px: n, area_m2: n * M.pixel_m * M.pixel_m, area_ha: n * M.pixel_m * M.pixel_m / 1e4,
+        row: sr / n, col: sc / n, lon: lonMin + (sc / n + .5) * pxLon, lat: latMax - (sr / n + .5) * pxLat,
+        r0, r1, c0, c1, ndvi_mean: nn ? sn / nn : NaN, ndvi_max: nn ? mx : NaN, slope_mean: ns ? ss / ns : NaN,
+        susc_dom: med ? NIV[5 - Math.trunc(med)] : 'N/D', compacidad: 4 * Math.PI * n / (per * per), en_inventario: inv,
+      });
+    }
+    return {labels: L, list};
+  }
+  // Hillshade (Horn / ESRI). Grid en grados → tamaño de celda en metros
+  function hillshade(D, z, az = 315, alt = 45){
+    const {w, h, n} = D, dem = D.dem, out = new Float32Array(n).fill(NaN);
+    const [lonMin, latMin, lonMax, latMax] = D.meta.bounds, latMid = (latMin + latMax) / 2 * Math.PI / 180;
+    const dx = (lonMax - lonMin) / w * 111320 * Math.cos(latMid), dy = (latMax - latMin) / h * 110574;
+    const zen = (90 - alt) * Math.PI / 180, azr = ((360 - az + 90) % 360) * Math.PI / 180;
+    const g = (y, x, c) => { y = Math.min(h-1, Math.max(0, y)); x = Math.min(w-1, Math.max(0, x)); const v = dem[y*w + x]; return Number.isNaN(v) ? c : v; };
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++){
+      const c = dem[y*w + x]; if (Number.isNaN(c)) continue;
+      const a = g(y-1,x-1,c), b = g(y-1,x,c), cc = g(y-1,x+1,c), d = g(y,x-1,c), f = g(y,x+1,c), gg = g(y+1,x-1,c), hh = g(y+1,x,c), ii = g(y+1,x+1,c);
+      const dzdx = ((cc + 2*f + ii) - (a + 2*d + gg)) / (8 * dx), dzdy = ((gg + 2*hh + ii) - (a + 2*b + cc)) / (8 * dy);
+      const sl = Math.atan(z * Math.hypot(dzdx, dzdy));
+      let asp = Math.atan2(dzdy, -dzdx); if (asp < 0) asp += 2 * Math.PI;
+      out[y*w + x] = Math.max(0, Math.cos(zen) * Math.cos(sl) + Math.sin(zen) * Math.sin(sl) * Math.cos(azr - asp));
+    }
+    return out;
+  }
+  // Contorno exacto de un conjunto de píxeles → [[anillo exterior, ...huecos], ...] en coordenadas de vértice (x, y↓)
+  function vectorize(px, w){
+    const set = new Set(px), out = new Map(), K = (x, y) => y * (w + 1) + x;
+    const add = (x0, y0, x1, y1) => { const k = K(x0, y0); if (!out.has(k)) out.set(k, []); out.get(k).push({x0, y0, x1, y1, used: false}); };
+    for (const i of px){
+      const y = Math.floor(i / w), x = i % w;
+      if (!(y > 0 && set.has(i - w)))            add(x, y, x + 1, y);
+      if (!((x + 1) % w && set.has(i + 1)))      add(x + 1, y, x + 1, y + 1);
+      if (!set.has(i + w))                       add(x + 1, y + 1, x, y + 1);
+      if (!(x > 0 && set.has(i - 1)))            add(x, y + 1, x, y);
+    }
+    const rings = [];
+    for (const list of out.values()) for (const e0 of list){
+      if (e0.used) continue;
+      const ring = [[e0.x0, e0.y0]]; let e = e0;
+      while (true){
+        e.used = true;
+        const dx = e.x1 - e.x0, dy = e.y1 - e.y0;
+        if (ring.length > 1){ const [px_, py_] = ring[ring.length - 2], [cx, cy] = ring[ring.length - 1];
+          if ((cx - px_) * dy - (cy - py_) * dx === 0) ring.pop(); }   // colineal
+        ring.push([e.x1, e.y1]);
+        const cand = (out.get(K(e.x1, e.y1)) || []).filter(n => !n.used);
+        if (!cand.length) break;
+        // en un vértice de pinza, girar a la derecha mantiene separado cada píxel diagonal
+        const score = n => { const ndx = n.x1 - n.x0, ndy = n.y1 - n.y0, cr = dx * ndy - dy * ndx; return cr > 0 ? 0 : cr === 0 ? 1 : 2; };
+        cand.sort((a, b) => score(a) - score(b)); e = cand[0];
+      }
+      // cerrar y quitar colinealidad en el punto inicial
+      if (ring.length > 3){ const a = ring[ring.length - 2], b = ring[0], c = ring[1];
+        if ((b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]) === 0){ ring.shift(); ring[ring.length - 1] = ring[0].slice(); } }
+      // partir anillos que se tocan a sí mismos (vértices de pinza) en anillos simples
+      const stack = [], pos = new Map();
+      for (let k = 0; k < ring.length - 1; k++){
+        const v = ring[k], key = v[0] + ',' + v[1];
+        if (pos.has(key)){
+          const sub = stack.splice(pos.get(key));
+          for (const u of sub) pos.delete(u[0] + ',' + u[1]);
+          if (sub.length >= 3) rings.push([...sub, sub[0].slice()]);
+        }
+        pos.set(key, stack.length); stack.push(v);
+      }
+      if (stack.length >= 3) rings.push([...stack, stack[0].slice()]);
+    }
+    const area = r => { let s = 0; for (let k = 0; k < r.length - 1; k++) s += r[k][0] * r[k+1][1] - r[k+1][0] * r[k][1]; return s / 2; };
+    const inside = (pt, r) => { let c = false; for (let k = 0, j = r.length - 2; k < r.length - 1; j = k++){
+      const [xi, yi] = r[k], [xj, yj] = r[j]; if ((yi > pt[1]) !== (yj > pt[1]) && pt[0] < (xj - xi) * (pt[1] - yi) / (yj - yi) + xi) c = !c; } return c; };
+    const outers = [], holes = [];
+    for (const r of rings) (area(r) > 0 ? outers : holes).push(r);   // y↓: horario = área positiva = exterior
+    const polys = outers.map(r => ({r, a: area(r), holes: []})).sort((p, q) => p.a - q.a);
+    for (const hRing of holes){
+      const [a, b] = hRing, dx = b[0] - a[0], dy = b[1] - a[1];
+      const pt = [(a[0] + b[0]) / 2 + 0.25 * dy, (a[1] + b[1]) / 2 - 0.25 * dx];
+      const p = polys.find(P => inside(pt, P.r)); if (p) p.holes.push(hRing);
+    }
+    return polys.map(P => [P.r, ...P.holes]);
+  }
+  root.Engine = {decode, percentile, sortedValid, prepare, metrics, dbscan, run, defaultCfg, clusters, hillshade, vectorize};
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+
+<script>
+/* ─── Interfaz ─── */
+const $ = s => document.querySelector(s);
+const fmt = n => Number(n).toLocaleString('en-US');
+const f3 = x => Number.isFinite(x) ? x.toFixed(3) : '–';
+let D = null, cfg = null, stages = null, snaps = [], selEv = -1;
+let baseMetrics = {};
+
+const FILTERS = [
+  {key:'bsi', name:'ΔBSI', desc:'Suelo expuesto. Percentil sobre los candidatos ΔNDVI.'},
+  {key:'slope', name:'Pendiente', desc:'Conserva solo ladera.'},
+  {key:'curv', name:'Curvatura', desc:'Descarta lo más convexo de lo que llega.'},
+  {key:'susc', name:'Susceptibilidad', desc:'Slope units en los niveles marcados.'},
+  {key:'ndviFinal', name:'ΔNDVI final', desc:'Segundo percentil de ΔNDVI sobre lo que queda.'},
+  {key:'dbscan', name:'DBSCAN', desc:'Elimina píxeles aislados (ruido).'},
+];
+const LABEL = {ndvi:'ΔNDVI', bsi:'+BSI', slope:'+Pend.', curv:'+Curv.', susc:'+Susc.', ndviFinal:'+ΔNDVI f.', dbscan:'+DBSCAN'};
+
+/* Carga */
+function loadFile(f){
+  $('#loadmsg').textContent = 'Leyendo ' + f.name + '…';
+  const rd = new FileReader();
+  rd.onload = () => {
+    try {
+      start(JSON.parse(rd.result));
+    } catch (e){
+      $('#loadmsg').textContent = 'No se pudo leer el archivo: ' + e.message + '. Verifica que sea el .json de la celda 17.';
+      console.error(e);
+    }
+  };
+  rd.readAsText(f);
+}
+function start(data){
+  D = Engine.prepare(data);
+  cfg = Engine.defaultCfg(D.meta);
+  snaps = []; selEv = -1;
+  init();
+}
+$('#file').addEventListener('change', e => e.target.files[0] && loadFile(e.target.files[0]));
+const drop = $('#drop');
+['dragover','dragenter'].forEach(t => document.addEventListener(t, e => { e.preventDefault(); drop.classList.add('hover'); }));
+['dragleave','drop'].forEach(t => document.addEventListener(t, e => { e.preventDefault(); drop.classList.remove('hover'); }));
+document.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if (f) loadFile(f); });
+
+function init(){
+  const M = D.meta;
+  $('#app').classList.remove('empty');
+  $('#ttl').textContent = M.sitio;
+  $('#sub').textContent = `Pre ${M.pre[0]} a ${M.pre[1]}   |   Post ${M.post[0]} a ${M.post[1]}   |   ${D.nEv} eventos ≥ ${M.area_min_m2} m²`;
+  for (const p of [90, 95, 99]) baseMetrics[p] = rawBase(p);
+  buildStack(); buildBg(); fitView();
+  checkReference();
+  loadVal();
+  renderSnaps();
+  buildLocator();
+  recompute();
+}
+function rawBase(p){
+  const t = Engine.percentile(D.ndviSorted, p), m = new Uint8Array(D.n);
+  for (let i = 0; i < D.n; i++) m[i] = D.ndvi[i] > t ? 1 : 0;
+  return Object.assign(Engine.metrics(D, m), {thr:t});
+}
+function checkReference(){
+  const ref = D.meta.referencia, el = $('#refcheck');
+  if (!ref){ el.textContent = ''; return; }
+  const st = Engine.run(D, Engine.defaultCfg(D.meta));
+  const got = {ndvi_p90: baseMetrics[90] || rawBase(90)};
+  for (const s of st) got[s.key] = s.m;
+  const bad = [];
+  for (const k of Object.keys(ref)){
+    const g = got[k]; if (!g) continue;
+    if (g.px !== ref[k].px || g.TP !== ref[k].TP) bad.push(`${k}: ${fmt(g.px)} px/${g.TP} TP vs notebook ${fmt(ref[k].px)}/${ref[k].TP}`);
+  }
+  el.className = bad.length ? 'bad' : 'ok';
+  el.textContent = bad.length ? 'Difiere del notebook en ' + bad.join('; ')
+                              : `Reproduce el notebook en las ${Object.keys(ref).length} etapas de referencia`;
+}
+
+/* Tarjetas de umbral base */
+function renderBaseCards(){
+  const box = $('#baseCards'); box.innerHTML = '';
+  for (const p of [90, 95, 99]){
+    const m = baseMetrics[p], b = document.createElement('button');
+    b.className = 'card' + (cfg.base === p ? ' active' : '');
+    b.innerHTML = `<b>P${p}</b>
+      <div class="kv"><span>umbral</span><span>${m.thr.toFixed(3)}</span></div>
+      <div class="kv"><span>px</span><span>${fmt(m.px)}</span></div>
+      <div class="kv"><span>TP</span><span>${m.TP}/${D.nEv}</span></div>
+      <div class="kv"><span>R</span><span>${f3(m.R)}</span></div>
+      <div class="kv"><span>P</span><span>${f3(m.P)}</span></div>
+      <div class="kv"><span>F1</span><span>${f3(m.F1)}</span></div>`;
+    b.onclick = () => { cfg.base = p; recompute(); };
+    box.appendChild(b);
+  }
+  $('#customP').value = cfg.base;
+}
+$('#customGo').onclick = () => {
+  const v = parseFloat($('#customP').value);
+  if (v >= 1 && v < 100){ cfg.base = v; recompute(); }
+};
+
+/* Pila de filtros */
+function buildStack(){
+  const ol = $('#stack'); ol.innerHTML = '';
+  const li0 = document.createElement('li'); li0.className = 'step base'; li0.dataset.key = 'ndvi';
+  li0.innerHTML = `<div class="row"><span class="name">ΔNDVI base</span><span class="param"><span class="val" id="v-ndvi"></span></span></div>
+    <div class="bar"><span></span></div><div class="nums"></div>`;
+  ol.appendChild(li0);
+  for (const F of FILTERS){
+    const c = cfg[F.key], li = document.createElement('li');
+    li.className = 'step'; li.dataset.key = F.key;
+    li.innerHTML = `<div class="row"><label class="sw"><input type="checkbox" aria-label="Activar ${F.name}"><i></i></label><span class="name">${F.name}</span></div>
+      <div class="desc">${F.desc}</div><div class="param"></div>
+      <div class="bar"><span></span></div><div class="nums"></div>`;
+    const tog = li.querySelector('.sw input'); tog.checked = c.on;
+    tog.onchange = () => { c.on = tog.checked; recompute(); };
+    const P = li.querySelector('.param');
+    if (F.key === 'bsi'){
+      P.innerHTML = `ΔBSI <select>${[0,25,50,75].map(p => `<option value="${p}">${p ? '> P'+p : '> 0'}</option>`).join('')}</select>`;
+      const s = P.querySelector('select'); s.value = c.p; s.onchange = () => { c.p = +s.value; recompute(); };
+    } else if (F.key === 'slope'){
+      rangeCtl(P, 0, 45, 1, c.t, v => { c.t = v; }, v => `> ${v}°`);
+    } else if (F.key === 'curv'){
+      rangeCtl(P, 50, 100, 1, c.p, v => { c.p = v; }, v => `≤ P${v}`);
+      if (!D.meta.curv_desde_dem) P.insertAdjacentHTML('afterend', '<div class="note">Calculada sobre la pendiente: el DEM no se encontró en el notebook.</div>');
+    } else if (F.key === 'susc'){
+      P.innerHTML = D.meta.niveles_presentes.map(lv => `<label class="chk"><input type="checkbox" value="${lv}" ${c.levels.includes(lv) ? 'checked' : ''}>${lv}</label>`).join('');
+      P.querySelectorAll('input').forEach(i => i.onchange = () => {
+        c.levels = [...P.querySelectorAll('input:checked')].map(x => x.value); recompute();
+      });
+    } else if (F.key === 'ndviFinal'){
+      rangeCtl(P, 50, 99, 1, c.p, v => { c.p = v; }, v => `> P${v}`);
+    } else if (F.key === 'dbscan'){
+      P.innerHTML = `eps <input type="number" min="1" max="5" step="0.5" value="${c.eps}"> min. vecinos <input type="number" min="1" max="30" step="1" value="${c.min}">`;
+      const [e, mn] = P.querySelectorAll('input');
+      e.onchange = () => { c.eps = Math.max(1, +e.value); recompute(); };
+      mn.onchange = () => { c.min = Math.max(1, Math.round(+mn.value)); recompute(); };
+    }
+    ol.appendChild(li);
+  }
+}
+function rangeCtl(P, min, max, step, val, set, lab){
+  P.innerHTML = `<input type="range" min="${min}" max="${max}" step="${step}" value="${val}"><span class="val">${lab(val)}</span>`;
+  const r = P.querySelector('input'), v = P.querySelector('.val');
+  let raf = 0;
+  r.oninput = () => { v.textContent = lab(+r.value); set(+r.value); cancelAnimationFrame(raf); raf = requestAnimationFrame(recompute); };
+}
+
+/* Recalcular todo */
+function recompute(){
+  stages = Engine.run(D, cfg);
+  renderBaseCards(); updateStack(); updateMetrics(); drawChart(); updateFN(); updateCands(); render();
+}
+function updateStack(){
+  const baseM = stages[0].m, byKey = {};
+  stages.forEach((s, i) => byKey[s.key] = {s, prev: stages[i-1]});
+  document.querySelectorAll('#stack .step').forEach(li => {
+    const k = li.dataset.key, hit = byKey[k];
+    li.classList.toggle('off', !hit);
+    const bar = li.querySelector('.bar span'), nums = li.querySelector('.nums');
+    if (k === 'ndvi') $('#v-ndvi').textContent = `> P${cfg.base}  (${stages[0].thr.toFixed(3)})`;
+    if (!hit){ bar.style.width = '0'; nums.innerHTML = '<span>Desactivado</span>'; return; }
+    const m = hit.s.m, pm = hit.prev ? hit.prev.m : null;
+    bar.style.width = (100 * m.px / Math.max(baseM.px, 1)).toFixed(1) + '%';
+    let thr = '';
+    if (k === 'bsi' || k === 'curv' || k === 'ndviFinal') thr = `<span>umbral ${Number.isFinite(hit.s.thr) ? hit.s.thr.toFixed(3) : '–'}</span>`;
+    if (k === 'dbscan') thr = `<span>${hit.s.nClusters} clusters</span>`;
+    let dF = '';
+    if (pm){ const d = m.F1 - pm.F1; dF = `<span class="${d >= 0 ? 'up' : 'down'}">${d >= 0 ? '+' : '−'}${Math.abs(d).toFixed(3)} F1</span>`; }
+    nums.innerHTML = `<span><b>${fmt(m.px)}</b> px</span><span>TP <b>${m.TP}</b></span><span>F1 <b>${f3(m.F1)}</b></span>${dF}${thr}`;
+  });
+}
+function updateMetrics(){
+  const s = stages[stages.length - 1], m = s.m;
+  $('#mF1').textContent = f3(m.F1); $('#mR').textContent = f3(m.R); $('#mP').textContent = f3(m.P);
+  $('#mTP').textContent = `${m.TP} de ${D.nEv}`; $('#mFN').textContent = m.FN;
+  $('#mPx').textContent = fmt(m.px); $('#mFPpx').textContent = fmt(m.fpPx);
+  $('#mFPev').textContent = m.FPev; $('#mF1px').textContent = f3(m.F1p);
+  const db = stages.find(x => x.key === 'dbscan');
+  $('#mClLab').hidden = $('#mCl').hidden = !db;
+  if (db) $('#mCl').textContent = db.nClusters;
+}
+function drawChart(){
+  const svg = $('#chart'), W = 320, H = 170, L = 30, R = 22, T = 10, B = 34;
+  const n = stages.length, x = i => L + (n === 1 ? (W-L-R)/2 : i * (W-L-R) / (n-1)), y = v => T + (1 - v) * (H-T-B);
+  const series = [['R', '#C28A2C', 'Recall'], ['P', '#2F5D73', 'Precisión'], ['F1', '#1E2B2F', 'F1']];
+  let g = '';
+  for (const t of [0, .25, .5, .75, 1]) g += `<line x1="${L}" x2="${W-R}" y1="${y(t)}" y2="${y(t)}" stroke="#D5DBD7"/><text x="${L-5}" y="${y(t)+4}" font-size="10" text-anchor="end" fill="#627277">${t}</text>`;
+  stages.forEach((s, i) => g += `<text x="${x(i)}" y="${H-B+15}" font-size="10" text-anchor="middle" fill="#627277">${LABEL[s.key]}</text>`);
+  for (const [k, col] of series){
+    const pts = stages.map((s, i) => `${x(i)},${y(s.m[k])}`).join(' ');
+    g += `<polyline points="${pts}" fill="none" stroke="${col}" stroke-width="${k === 'F1' ? 2.2 : 1.6}"/>`;
+    stages.forEach((s, i) => g += `<circle cx="${x(i)}" cy="${y(s.m[k])}" r="2.8" fill="${col}"><title>${k} ${s.m[k].toFixed(3)}</title></circle>`);
+  }
+  series.forEach(([k, col, lab], j) => g += `<rect x="${L + j*80}" y="${H-10}" width="9" height="3" fill="${col}"/><text x="${L + j*80 + 13}" y="${H-6}" font-size="10.5" fill="#1E2B2F">${lab}</text>`);
+  svg.innerHTML = g;
+}
+function cfgLabel(){
+  const p = [`P${cfg.base}`];
+  if (cfg.bsi.on) p.push(`BSI ${cfg.bsi.p ? '>P' + cfg.bsi.p : '>0'}`);
+  if (cfg.slope.on) p.push(`pend. >${cfg.slope.t}°`);
+  if (cfg.curv.on) p.push(`curv ≤P${cfg.curv.p}`);
+  if (cfg.susc.on) p.push(`susc ${cfg.susc.levels.map(l => l.split(' ').map(w => w[0]).join('')).join('/')}`);
+  if (cfg.ndviFinal.on) p.push(`ΔNDVI f. >P${cfg.ndviFinal.p}`);
+  if (cfg.dbscan.on) p.push(`DBSCAN ${cfg.dbscan.eps}/${cfg.dbscan.min}`);
+  return p.join(' + ');
+}
+$('#snap').onclick = () => {
+  const m = stages[stages.length - 1].m;
+  snaps.push({label: cfgLabel(), px: m.px, TP: m.TP, R: m.R, P: m.P, F1: m.F1});
+  renderSnaps();
+};
+function renderSnaps(){
+  const tb = $('#snaps tbody'), best = snaps.length ? Math.max(...snaps.map(s => s.F1)) : -1;
+  if (!snaps.length){ tb.innerHTML = '<tr><td colspan="7" style="color:var(--muted);text-align:left;padding:8px 3px">Guarda configuraciones para compararlas lado a lado.</td></tr>'; return; }
+  tb.innerHTML = snaps.map((s, i) => `<tr class="${s.F1 === best && snaps.length > 1 ? 'best' : ''}"><td class="cfg">${s.label}</td><td>${fmt(s.px)}</td><td>${s.TP}</td><td>${f3(s.R)}</td><td>${f3(s.P)}</td><td>${f3(s.F1)}</td><td><button class="x" data-i="${i}" aria-label="Quitar">×</button></td></tr>`).join('');
+  tb.querySelectorAll('.x').forEach(b => b.onclick = () => { snaps.splice(+b.dataset.i, 1); renderSnaps(); });
+}
+function updateFN(){
+  const m = stages[stages.length - 1].m, A = D.meta.ev_area_m2 || [];
+  const fn = []; for (let e = 0; e < D.nEv; e++) if (!m.tp[e]) fn.push(e);
+  fn.sort((a, b) => (A[b] || 0) - (A[a] || 0));
+  $('#fnTitle').textContent = `Eventos no detectados (${fn.length})`;
+  if (selEv >= 0 && !fn.includes(selEv)) selEv = -1;
+  const ul = $('#fnList');
+  ul.innerHTML = fn.map(e => `<li data-e="${e}" class="${e === selEv ? 'sel' : ''}"><span>id ${e}</span><span>${A[e] != null ? fmt(Math.round(A[e])) + ' m²' : ''}</span></li>`).join('');
+  ul.querySelectorAll('li').forEach(li => li.onclick = () => {
+    selEv = +li.dataset.e; ul.querySelectorAll('li').forEach(x => x.classList.toggle('sel', x === li));
+    const [r, c] = D.evCentroid[selEv]; centerOn(r, c, 8); render();
+  });
+}
+
+/* Mapa */
+const cv = $('#map'), ctx = cv.getContext('2d'), vp = $('#viewport'), bcv = $('#base'), bctx = bcv.getContext('2d');
+/* ─── Geometría: grid ↔ lon/lat ↔ teselas Web Mercator ─── */
+const TILE = (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`;
+const lon2tx = (lon, z) => (lon + 180) / 360 * 2 ** z;
+const lat2ty = (lat, z) => { const r = lat * Math.PI / 180; return (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * 2 ** z; };
+const tx2lon = (x, z) => x / 2 ** z * 360 - 180;
+const ty2lat = (y, z) => 180 / Math.PI * Math.atan(Math.sinh(Math.PI - 2 * Math.PI * y / 2 ** z));
+let G = null;   // {lonMin, latMax, pl, pa, mx (m por columna), lat}
+function setGeo(){
+  const [lonMin, latMin, lonMax, latMax] = D.meta.bounds, lat = (latMin + latMax) / 2;
+  G = {lonMin, latMin, lonMax, latMax, lat, pl: (lonMax - lonMin) / D.w, pa: (latMax - latMin) / D.h};
+  G.mx = G.pl * 111320 * Math.cos(lat * Math.PI / 180);
+}
+const toGrid = (lon, lat) => [(lon - G.lonMin) / G.pl, (G.latMax - lat) / G.pa];
+const zoomFor = mpp => Math.round(Math.log2(156543.03 * Math.cos(G.lat * Math.PI / 180) / mpp));
+// Coloca teselas que cubren [lonW, latS, lonE, latN] en un contenedor; xy(lon,lat) → posición en el contenedor
+function placeTiles(box, z, xy, cont, max = 160){
+  const x0 = Math.floor(lon2tx(box[0], z)), x1 = Math.floor(lon2tx(box[2], z));
+  const y0 = Math.floor(lat2ty(box[3], z)), y1 = Math.floor(lat2ty(box[1], z));
+  if ((x1 - x0 + 1) * (y1 - y0 + 1) > max) return false;
+  const frag = document.createDocumentFragment();
+  for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++){
+    const [ax, ay] = xy(tx2lon(x, z), ty2lat(y, z)), [bx, by] = xy(tx2lon(x + 1, z), ty2lat(y + 1, z));
+    const im = new Image(); im.decoding = 'async'; im.loading = 'eager'; im.alt = ''; im.draggable = false;
+    im.onerror = () => im.remove();
+    im.style.cssText = `left:${ax}px;top:${ay}px;width:${bx - ax + .04 * (bx - ax) / 50}px;height:${by - ay + .04 * (by - ay) / 50}px`;
+    im.src = TILE(z, x, y); frag.appendChild(im);
+  }
+  cont.appendChild(frag); return true;
+}
+// polígonos [[ring flat lon,lat...]...] → path; proj(lon,lat) → [x,y]
+function polyPath(polys, proj, nd = 2){
+  let d = '';
+  for (const P of polys || []) for (const r of P){
+    for (let k = 0; k < r.length; k += 2){ const [x, y] = proj(r[k], r[k+1]); d += (k ? 'L' : 'M') + x.toFixed(nd) + ' ' + y.toFixed(nd); }
+    d += 'Z';
+  }
+  return d;
+}
+function linePath(lines, proj, nd = 2){
+  let d = '';
+  for (const r of lines || []) for (let k = 0; k < r.length; k += 2){ const [x, y] = proj(r[k], r[k+1]); d += (k ? 'L' : 'M') + x.toFixed(nd) + ' ' + y.toFixed(nd); }
+  return d;
+}
+function buildVectors(){
+  const V = D.meta.vector || {};
+  D.vecPaths = {water: polyPath(V.water, toGrid), ww: linePath(V.waterways, toGrid), bld: polyPath(V.buildings, toGrid)};
+  const svg = $('#vec'); svg.setAttribute('viewBox', `0 0 ${D.w} ${D.h}`); svg.setAttribute('width', D.w); svg.setAttribute('height', D.h);
+  svg.innerHTML = vecSVG();
+  const nb = (V.buildings || []).length, nw = (V.water || []).length + (V.waterways || []).length;
+  $('#lyBld').parentElement.title = `${fmt(nb)} edificios OSM en el área`;
+  $('#lyWater').parentElement.title = `${fmt(nw)} elementos de agua OSM en el área`;
+}
+function vecSVG(){
+  const P = D.vecPaths; let g = '';
+  if ($('#lyWater').checked){ if (P.water) g += `<path class="v-water" d="${P.water}"/>`; if (P.ww) g += `<path class="v-ww" d="${P.ww}"/>`; }
+  if ($('#lyBld').checked && P.bld) g += `<path class="v-bld" d="${P.bld}"/>`;
+  return g;
+}
+['#lyWater','#lyBld'].forEach(q => $(q).addEventListener('change', () => { $('#vec').innerHTML = vecSVG(); renderCand(); }));
+
+/* Ortofoto en el mapa principal: una capa base para todo el AOI + detalle según zoom */
+let tileZ = -1, tileTimer = 0;
+function orthoOn(){ return $('#bg').value.startsWith('ortho'); }
+function loadBaseTiles(){
+  const cont = $('#tiles'); cont.innerHTML = '';
+  const z = Math.min(16, zoomFor(G.mx / 1.5));
+  placeTiles([G.lonMin, G.latMin, G.lonMax, G.latMax], z, toGrid, cont, 400);
+  D.tilesBaseZ = z;
+}
+function updateDetailTiles(){
+  if (!D || !orthoOn()) return;
+  const z = Math.min(18, zoomFor(G.mx / view.k)), cont = $('#tilesD');
+  if (z <= D.tilesBaseZ){ cont.innerHTML = ''; tileZ = -1; return; }
+  const W = vp.clientWidth, H = vp.clientHeight;
+  const c0 = Math.max(0, -view.x / view.k), c1 = Math.min(D.w, (W - view.x) / view.k);
+  const r0 = Math.max(0, -view.y / view.k), r1 = Math.min(D.h, (H - view.y) / view.k);
+  if (c1 <= c0 || r1 <= r0) return;
+  cont.innerHTML = ''; tileZ = z;
+  placeTiles([G.lonMin + c0 * G.pl, G.latMax - r1 * G.pa, G.lonMin + c1 * G.pl, G.latMax - r0 * G.pa], z, toGrid, cont, 120);
+}
+function updateScale(){
+  const mpp = G.mx / view.k, nice = [5,10,20,50,100,200,500,1000,2000,5000,10000];
+  let L = nice[0]; for (const n of nice) if (n / mpp <= 130) L = n;
+  $('#scalebar .sb').style.width = (L / mpp).toFixed(1) + 'px';
+  $('#scalebar span').textContent = L >= 1000 ? (L / 1000) + ' km' : L + ' m';
+}
+
+let bgCache = {}, view = {k:1, x:0, y:0};
+const Z_FACTOR = 1.5;   // exageración vertical del hillshade
+function buildBg(){
+  for (const c of [cv, bcv]){ c.width = D.w; c.height = D.h; c.style.width = D.w + 'px'; c.style.height = D.h + 'px'; }
+  $('#tiles').innerHTML = ''; $('#tilesD').innerHTML = ''; bgCache = {}; lastBase = null; D.tilesBaseZ = null;
+  setGeo(); buildVectors();
+  const opt = $('#bg option[value=hillshade]');
+  opt.disabled = !D.dem; $('#bg option[value=ortho_hs]').disabled = !D.dem;
+  $('#bg').value = D.dem ? 'ortho_hs' : 'ortho';
+  opt.textContent = D.dem ? `Hillshade (×${Z_FACTOR})` : 'Hillshade (sin DEM en el .json)';
+}
+function pctRange(arr, lo, hi){
+  const s = Engine.sortedValid(arr, null);
+  return [Engine.percentile(s, lo), Engine.percentile(s, hi)];
+}
+function bgImage(kind){
+  if (bgCache[kind]) return bgCache[kind];
+  const img = new Uint8ClampedArray(D.n * 4);
+  if (kind === 'hillshade'){
+    if (!D.hs) D.hs = Engine.hillshade(D, Z_FACTOR);
+    for (let i = 0; i < D.n; i++){
+      const v = D.hs[i];
+      if (Number.isNaN(v)){ img[i*4] = 231; img[i*4+1] = 234; img[i*4+2] = 230; img[i*4+3] = 255; continue; }
+      const g = 45 + v * 205; img[i*4] = g; img[i*4+1] = g + 2; img[i*4+2] = g - 2; img[i*4+3] = 255;
+    }
+  } else if (kind === 'rgb_pre' || kind === 'rgb_post'){
+    const a = D[kind];
+    for (let i = 0; i < D.n; i++){ img[i*4] = a[i*3]; img[i*4+1] = a[i*3+1]; img[i*4+2] = a[i*3+2]; img[i*4+3] = 255; }
+  } else {
+    const a = D[kind];
+    let [lo, hi] = kind === 'slope' ? [0, pctRange(a, 0, 99)[1]] : pctRange(a, 2, 98);
+    if (kind === 'curv'){ const v = Math.max(Math.abs(lo), Math.abs(hi)); lo = -v; hi = v; }
+    for (let i = 0; i < D.n; i++){
+      const v = a[i]; let g;
+      if (Number.isNaN(v)){ img[i*4] = 231; img[i*4+1] = 234; img[i*4+2] = 230; img[i*4+3] = 255; continue; }
+      const t = Math.min(1, Math.max(0, (v - lo) / (hi - lo + 1e-12)));
+      g = 245 - t * 175;   // claro = bajo, oscuro = alto
+      img[i*4] = g; img[i*4+1] = g + 3; img[i*4+2] = g; img[i*4+3] = 255;
+    }
+  }
+  return bgCache[kind] = img;
+}
+function hex(c){ return [parseInt(c.slice(1,3),16), parseInt(c.slice(3,5),16), parseInt(c.slice(5,7),16)]; }
+const C = {det: hex('#B03A2E'), detIn: hex('#1F5A33'), tp: hex('#3E7B53'), fn: hex('#C28A2C'), drop: hex('#8A9590'), sel: hex('#2F5D73')};
+function blend(img, i, c, a){ img[i*4] = img[i*4]*(1-a) + c[0]*a; img[i*4+1] = img[i*4+1]*(1-a) + c[1]*a; img[i*4+2] = img[i*4+2]*(1-a) + c[2]*a; }
+let lastBase = null;
+function drawBase(){
+  const kind = $('#bg').value, ortho = orthoOn();
+  $('#tiles').style.display = $('#tilesD').style.display = ortho ? '' : 'none';
+  $('#attrib').hidden = !ortho;
+  if (ortho && D.tilesBaseZ == null){ loadBaseTiles(); updateDetailTiles(); }
+  const rast = kind === 'ortho' ? null : kind === 'ortho_hs' ? 'hillshade' : kind;
+  bcv.style.display = rast ? '' : 'none';
+  bcv.style.mixBlendMode = kind === 'ortho_hs' ? 'multiply' : 'normal';
+  bcv.style.opacity = kind === 'ortho_hs' ? .55 : 1;
+  if (rast && lastBase !== rast){ bctx.putImageData(new ImageData(new Uint8ClampedArray(bgImage(rast)), D.w, D.h), 0, 0); lastBase = rast; }
+}
+function render(){
+  if (!D) return;
+  drawBase();
+  const img = new Uint8ClampedArray(D.n * 4);
+  const put = (i, c, a) => { img[i*4] = c[0]; img[i*4+1] = c[1]; img[i*4+2] = c[2]; img[i*4+3] = a * 255; };
+  const fin = stages[stages.length - 1], m = fin.mask, base = stages[0].mask, tp = fin.m.tp;
+  const showInv = $('#lyInv').checked, showDet = $('#lyDet').checked, showDrop = $('#lyDrop').checked;
+  if (showInv){
+    for (let e = 0; e < D.nEv; e++){
+      const col = tp[e] ? C.tp : C.fn, a = tp[e] ? .6 : .85;
+      for (let k = D.inv_off[e]; k < D.inv_off[e+1]; k++) put(D.inv_idx[k], col, a);
+    }
+  }
+  for (let i = 0; i < D.n; i++){
+    if (m[i]){ if (showDet) put(i, showInv && D.inv[i] ? C.detIn : C.det, .92); }
+    else if (showDrop && base[i]) put(i, C.drop, .6);
+  }
+  const outline = (px, test, col) => {
+    for (const q of px){
+      const y = Math.floor(q / D.w), x = q % D.w;
+      for (const [dy, dx] of [[-1,0],[1,0],[0,-1],[0,1]]){
+        const yy = y+dy, xx = x+dx, r = yy*D.w + xx;
+        if (yy>=0 && yy<D.h && xx>=0 && xx<D.w && !test(r)) put(r, col, 1);
+      }
+    }
+  };
+  const cs = curCand();
+  if (cs) outline(cs.px, r => CL.labels[r] === cs.id, [242,210,75]);
+  if (selEv >= 0){
+    const set = new Set(); for (let k = D.inv_off[selEv]; k < D.inv_off[selEv+1]; k++) set.add(D.inv_idx[k]);
+    outline(set, r => set.has(r), C.sel);
+  }
+  ctx.putImageData(new ImageData(img, D.w, D.h), 0, 0);
+}
+['#bg','#lyDet','#lyDrop','#lyInv'].forEach(s => $(s).addEventListener('change', render));
+
+/* ─── Validación de candidatos (equivalente al widget de la celda 13) ─── */
+let CL = {labels: new Int32Array(0), list: []}, order = [], vIdx = 0, VAL = {}, sortK = 'rank', sortDir = 1;
+const ST = ['Confirmado','Descartado','Dudoso','Pendiente'];
+const valKey = () => 'validacion:' + D.meta.sitio;
+function loadVal(){ try { VAL = JSON.parse(localStorage.getItem(valKey()) || '{}'); } catch (e){ VAL = {}; } }
+function saveVal(){ try { localStorage.setItem(valKey(), JSON.stringify(VAL)); } catch (e){} }
+const estado = c => (VAL[c.seed] || {}).estado || 'Pendiente';
+function curCand(){ return order[vIdx] || null; }
+function updateCands(){
+  const prev = curCand(), fin = stages[stages.length - 1].mask;
+  CL = Engine.clusters(D, fin, cfg.dbscan.eps, cfg.dbscan.min);
+  const byArea = CL.list.slice().sort((a, b) => b.area_m2 - a.area_m2);
+  byArea.forEach((c, i) => c.rank = i + 1);
+  order = byArea; sortList();
+  vIdx = prev ? Math.max(0, order.findIndex(c => c.seed === prev.seed)) : 0;
+  $('#vsub').textContent = `${order.length} candidatos: clusters DBSCAN (eps ${cfg.dbscan.eps}, mín. ${cfg.dbscan.min}) sobre el resultado de la pila actual. ` +
+    'Si cambias los filtros, la lista se actualiza y conserva lo que ya validaste. Clic en el mapa sobre un candidato para abrirlo.';
+  renderVTable(); renderCand();
+}
+function sortList(){
+  const k = sortK;
+  order.sort((a, b) => {
+    const va = k === 'estado' ? estado(a) : a[k], vb = k === 'estado' ? estado(b) : b[k];
+    return (va < vb ? -1 : va > vb ? 1 : 0) * sortDir;
+  });
+}
+document.querySelectorAll('#vtable th').forEach(th => th.onclick = () => {
+  const cur = curCand();
+  if (sortK === th.dataset.k) sortDir *= -1; else { sortK = th.dataset.k; sortDir = th.dataset.k === 'rank' || th.dataset.k === 'estado' ? 1 : -1; }
+  sortList(); vIdx = cur ? order.indexOf(cur) : 0; renderVTable();
+});
+function renderVTable(){
+  const cnt = {Confirmado:0, Descartado:0, Dudoso:0, Pendiente:0};
+  order.forEach(c => cnt[estado(c)]++);
+  $('#vcounts').innerHTML = ST.map(s => `<span><i class="dot st-${s}"></i>${s} <b>${cnt[s]}</b></span>`).join('');
+  const N = Math.max(order.length, 1);
+  $('#vprog').innerHTML = ST.map(s => `<i class="st-${s}" style="width:${100 * cnt[s] / N}%"></i>`).join('');
+  $('#vtable tbody').innerHTML = order.map((c, i) => `<tr data-i="${i}" class="${i === vIdx ? 'sel' : ''}">
+    <td>${c.rank}</td><td>${c.area_ha.toFixed(2)}</td><td>${f3(c.ndvi_mean)}</td><td>${Number.isFinite(c.slope_mean) ? c.slope_mean.toFixed(1) + '°' : '–'}</td>
+    <td>${c.susc_dom}</td><td><span style="display:flex;align-items:center;gap:5px"><i class="dot st-${estado(c)}"></i>${estado(c)}</span></td></tr>`).join('');
+  $('#vtable tbody').querySelectorAll('tr').forEach(tr => tr.onclick = () => selectCand(+tr.dataset.i));
+}
+function selectCand(i){
+  if (!order.length) return;
+  vIdx = (i + order.length) % order.length;
+  document.querySelectorAll('#vtable tbody tr').forEach((tr, k) => tr.classList.toggle('sel', k === vIdx));
+  const tr = document.querySelector(`#vtable tbody tr[data-i="${vIdx}"]`); if (tr) tr.scrollIntoView({block:'nearest'});
+  renderCand(); render();
+}
+function mark(st){
+  const c = curCand(); if (!c) return;
+  VAL[c.seed] = {estado: st, nota: $('#vNota').value.trim()}; saveVal();
+  renderVTable(); updateLocator();
+  const k = order.findIndex((o, j) => j > vIdx && estado(o) === 'Pendiente');
+  selectCand(k >= 0 ? k : vIdx + 1);
+}
+document.querySelectorAll('.vactions [data-st]').forEach(b => b.onclick = () => mark(b.dataset.st));
+$('#vPrev').onclick = () => selectCand(vIdx - 1);
+$('#vNext').onclick = () => selectCand(vIdx + 1);
+$('#vNota').addEventListener('change', () => { const c = curCand(); if (c){ VAL[c.seed] = {estado: estado(c), nota: $('#vNota').value.trim()}; saveVal(); } });
+$('#vInv').addEventListener('change', renderCand);
+document.addEventListener('keydown', e => {
+  if (!D || !order.length || /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return;
+  const r = $('#valid').getBoundingClientRect(); if (r.top > innerHeight * .6 || r.bottom < 100) return;
+  const k = e.key.toLowerCase();
+  if (k === 'c') mark('Confirmado'); else if (k === 'd') mark('Descartado'); else if (k === 'u') mark('Dudoso');
+  else if (e.key === 'ArrowRight'){ e.preventDefault(); selectCand(vIdx + 1); }
+  else if (e.key === 'ArrowLeft'){ e.preventDefault(); selectCand(vIdx - 1); }
+});
+
+function cropBox(c){
+  const side = Math.max(c.r1 - c.r0, c.c1 - c.c0) + 1 + 2 * 5, S = Math.max(side, 28);
+  const r0 = Math.round((c.r0 + c.r1) / 2 - S / 2), c0 = Math.round((c.c0 + c.c1) / 2 - S / 2);
+  return {r0, c0, S};
+}
+const RDYLGN = [[26,152,80],[145,207,96],[255,255,191],[252,141,89],[215,48,39]];
+function divColor(t){ t = Math.min(1, Math.max(0, t)) * 4; const i = Math.min(3, Math.floor(t)), f = t - i, a = RDYLGN[i], b = RDYLGN[i+1]; return [a[0]+(b[0]-a[0])*f, a[1]+(b[1]-a[1])*f, a[2]+(b[2]-a[2])*f]; }
+function drawCrop(cv, c, kind){
+  const {r0, c0, S} = cropBox(c), img = new Uint8ClampedArray(S * S * 4), idx = [];
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++){
+    const r = r0 + y, cc = c0 + x;
+    idx.push(r >= 0 && r < D.h && cc >= 0 && cc < D.w ? r * D.w + cc : -1);
+  }
+  if (kind === 'rgb_pre' || kind === 'rgb_post'){
+    const a = D[kind];
+    for (let ch = 0; ch < 3; ch++){        // estiramiento local p2–p98 por canal (como el widget)
+      const vals = idx.filter(i => i >= 0).map(i => a[i*3+ch]).sort((p, q) => p - q);
+      const lo = Engine.percentile(vals, 2), hi = Engine.percentile(vals, 98);
+      idx.forEach((i, k) => { img[k*4+ch] = i < 0 ? 217 : 255 * (a[i*3+ch] - lo) / (hi - lo + 1e-9); });
+    }
+  } else if (kind === 'ndvi'){
+    const vals = idx.filter(i => i >= 0 && !Number.isNaN(D.ndvi[i])).map(i => Math.abs(D.ndvi[i])).sort((p, q) => p - q);
+    const vm = Engine.percentile(vals, 98) || 1;
+    idx.forEach((i, k) => { const v = i < 0 ? NaN : D.ndvi[i];
+      const col = Number.isNaN(v) ? [217,222,217] : divColor((v + vm) / (2 * vm)); img[k*4] = col[0]; img[k*4+1] = col[1]; img[k*4+2] = col[2]; });
+  } else {
+    const src = bgImage(D.dem ? 'hillshade' : 'slope');
+    idx.forEach((i, k) => { for (let ch = 0; ch < 3; ch++) img[k*4+ch] = i < 0 ? 217 : src[i*4+ch]; });
+  }
+  for (let k = 0; k < S * S; k++) img[k*4+3] = 255;
+  // contorno del candidato (amarillo) e inventario (cian, opcional)
+  const showInv = $('#vInv').checked, L = CL.labels;
+  idx.forEach((i, k) => {
+    if (i < 0) return;
+    const y = Math.floor(i / D.w), x = i % D.w;
+    const edge = test => [[-1,0],[1,0],[0,-1],[0,1]].some(([dy, dx]) => { const yy = y+dy, xx = x+dx; return yy < 0 || yy >= D.h || xx < 0 || xx >= D.w || !test(yy*D.w + xx); });
+    let col = null;
+    if (L[i] === c.id && edge(q => L[q] === c.id)) col = [242,210,75];
+    else if (showInv && D.inv[i] && edge(q => D.inv[q])) col = [80,215,230];
+    if (col){ img[k*4] = col[0]; img[k*4+1] = col[1]; img[k*4+2] = col[2]; }
+  });
+  cv.width = S; cv.height = S;
+  cv.getContext('2d').putImageData(new ImageData(img, S, S), 0, 0);
+}
+function renderCand(){
+  if (!D || !G) return;
+  const c = curCand();
+  if (!c){ $('#vtitle').textContent = 'Sin candidatos con la configuración actual'; $('#vinfo').innerHTML = '';
+    for (let k = 0; k < 4; k++){ const cv = $('#vc' + k); cv.getContext('2d').clearRect(0, 0, cv.width, cv.height); }
+    $('#vOrtho').innerHTML = ''; updateLocator(); return; }
+  const v = VAL[c.seed] || {};
+  $('#vtitle').innerHTML = `Candidato ${vIdx + 1} de ${order.length}  <span style="color:var(--muted);font-weight:500">(#${c.rank} por área)</span>  <i class="dot st-${estado(c)}" style="margin-left:6px"></i> ${estado(c)}`;
+  $('#vNota').value = v.nota || '';
+  $('#vf0').textContent = `RGB pre  ${D.meta.pre[0]} a ${D.meta.pre[1]}`;
+  $('#vf1').textContent = `RGB post  ${D.meta.post[0]} a ${D.meta.post[1]}`;
+  $('#vf3').textContent = D.dem ? `Hillshade ×${Z_FACTOR}` : 'Pendiente';
+  ['rgb_pre','rgb_post','ndvi','terrain'].forEach((k, i) => drawCrop($('#vc' + i), c, k));
+  drawOrtho(c); updateLocator();
+  const inv = $('#vInv').checked ? `<span>Inventario <b>${c.en_inventario ? 'coincide' : 'no coincide'}</b></span>` : '';
+  $('#vinfo').innerHTML = `<span>Área <b>${c.area_ha.toFixed(3)} ha</b> (${fmt(c.n_px)} px)</span>
+    <span>ΔNDVI medio <b>${f3(c.ndvi_mean)}</b>, máx. <b>${f3(c.ndvi_max)}</b></span>
+    <span>Pendiente media <b>${Number.isFinite(c.slope_mean) ? c.slope_mean.toFixed(1) + '°' : '–'}</b></span>
+    <span>Susc. <b>${c.susc_dom}</b></span><span>Compacidad <b>${c.compacidad.toFixed(2)}</b></span>
+    <span>Lon, lat <b>${c.lon.toFixed(5)}, ${c.lat.toFixed(5)}</b></span>${inv}`;
+}
+
+
+/* Recorte de ortofoto del candidato (Esri, zoom alto) con vectores */
+function drawOrtho(c){
+  const box = $('#vOrtho'), P = box.clientWidth; if (!P) return;
+  const {r0, c0, S} = cropBox(c), f = P / S;
+  const xy = (lon, lat) => { const [x, y] = toGrid(lon, lat); return [(x - c0) * f, (y - r0) * f]; };
+  box.innerHTML = '';
+  const tl = document.createElement('div'); box.appendChild(tl);
+  const z = Math.min(18, zoomFor(S * G.mx / P));
+  placeTiles([G.lonMin + c0 * G.pl, G.latMax - (r0 + S) * G.pa, G.lonMin + (c0 + S) * G.pl, G.latMax - r0 * G.pa], z, xy, tl, 64);
+  const cand = Engine.vectorize(c.px, D.w).map(Pp => Pp.map(r => r.flat()));
+  let inv = '';
+  if ($('#vInv').checked){
+    for (let e = 0; e < D.nEv; e++){
+      const a = D.inv_off[e], b = D.inv_off[e+1], q = D.inv_idx[a], y = Math.floor(q / D.w), x = q % D.w;
+      if (y < r0 - 60 || y > r0 + S + 60 || x < c0 - 60 || x > c0 + S + 60) continue;
+      inv += Engine.vectorize(Array.from(D.inv_idx.subarray(a, b)), D.w).map(Pp => Pp.map(r => 'M' + r.map(p => p.join(' ')).join('L') + 'Z').join('')).join('');
+    }
+  }
+  const candD = cand.map(Pp => Pp.map(r => { let d = ''; for (let k = 0; k < r.length; k += 2) d += (k ? 'L' : 'M') + r[k] + ' ' + r[k+1]; return d + 'Z'; }).join('')).join('');
+  box.insertAdjacentHTML('beforeend', `<svg viewBox="${c0} ${r0} ${S} ${S}" preserveAspectRatio="none">${vecSVG()}${inv ? `<path class="v-inv" d="${inv}"/>` : ''}<path class="v-cand" d="${candD}"/></svg>`);
+  const mpp = S * G.mx / P, nice = [10,20,25,50,100,200,250,500];
+  let L = 10; for (const n of nice) if (n / mpp <= P * .3) L = n;
+  box.insertAdjacentHTML('beforeend', `<div class="osb"><div style="width:${(L / mpp).toFixed(1)}px"></div>${L} m</div>`);
+}
+
+/* Mapas de localización: Antioquia y municipio, sobre ortofoto */
+const W0 = (lon, lat) => [lon2tx(lon, 0) * 256, lat2ty(lat, 0) * 256];   // Web Mercator, píxeles a zoom 0
+function bboxOf(polys){
+  let a = [Infinity, Infinity, -Infinity, -Infinity];
+  for (const P of polys || []) for (const r of P) for (let k = 0; k < r.length; k += 2){
+    a[0] = Math.min(a[0], r[k]); a[2] = Math.max(a[2], r[k]); a[1] = Math.min(a[1], r[k+1]); a[3] = Math.max(a[3], r[k+1]); }
+  return a;
+}
+function locSVG(svg, bb, pad, targetPx, inner){
+  const [x0, y1] = W0(bb[0], bb[1]), [x1, y0] = W0(bb[2], bb[3]);
+  const w = x1 - x0, h = y1 - y0, p = Math.max(w, h) * pad;
+  const vb = [x0 - p, y0 - p, w + 2*p, h + 2*p];
+  svg.setAttribute('viewBox', vb.join(' '));
+  const z = Math.max(0, Math.min(17, Math.round(Math.log2(targetPx / vb[2]))));
+  const tx0 = Math.floor(vb[0] / 256 * 2 ** z), tx1 = Math.floor((vb[0] + vb[2]) / 256 * 2 ** z);
+  const ty0 = Math.floor(vb[1] / 256 * 2 ** z), ty1 = Math.floor((vb[1] + vb[3]) / 256 * 2 ** z);
+  let t = '', u = 256 / 2 ** z;
+  if ((tx1 - tx0 + 1) * (ty1 - ty0 + 1) <= 80)
+    for (let x = tx0; x <= tx1; x++) for (let y = ty0; y <= ty1; y++)
+      t += `<image href="${TILE(z, x, y)}" x="${x * u}" y="${y * u}" width="${u * 1.002}" height="${u * 1.002}" preserveAspectRatio="none"/>`;
+  svg.innerHTML = t + inner;
+  return vb;
+}
+let locVB = null;
+function buildLocator(){
+  const L = D.meta.loc, box = $('.vloc');
+  if (!L){ box.innerHTML = '<p class="hint">Este .json no trae la capa de municipios. Vuelve a correr la celda 17 para incluir el mapa de localización.</p>'; return; }
+  const pp = polys => polyPath(polys, W0, 5);
+  const nom = L.mpio.nombre.toLowerCase().replace(/(^|\s)\S/g, m => m.toUpperCase());
+  $('#locMpioName').textContent = nom; $('#locMpioName2').textContent = nom;
+  locSVG($('#locDep'), bboxOf(L.antioquia), .04, 300,
+    `<path class="l-mun" d="${pp(L.municipios)}"/><path class="l-sel" d="${pp(L.mpio.polys)}"/><path class="l-dep" d="${pp(L.antioquia)}"/>`);
+  const bb = bboxOf(L.mpio.polys); bb[0] = Math.min(bb[0], G.lonMin); bb[1] = Math.min(bb[1], G.latMin); bb[2] = Math.max(bb[2], G.lonMax); bb[3] = Math.max(bb[3], G.latMax);
+  const [ax, ay] = W0(G.lonMin, G.latMax), [bx, by] = W0(G.lonMax, G.latMin);
+  locVB = locSVG($('#locMpio'), bb, .06, 420,
+    `<path class="l-mun" d="${pp(L.municipios)}"/><path class="l-halo" d="${pp(L.mpio.polys)}"/><path class="l-mpio" d="${pp(L.mpio.polys)}"/>
+     <rect class="l-aoi" x="${ax}" y="${ay}" width="${bx - ax}" height="${by - ay}"/><g id="locPts"></g>`);
+}
+const ST_COL = {Confirmado:'#3E7B53', Descartado:'#B03A2E', Dudoso:'#C28A2C', Pendiente:'#E7EAE6'};
+function updateLocator(){
+  const g = $('#locPts'); if (!g || !locVB) return;
+  const u = locVB[2] / 300, cur = curCand();
+  let t = '';
+  for (const c of order){ const [x, y] = W0(c.lon, c.lat);
+    t += `<circle cx="${x}" cy="${y}" r="${u * 2.2}" fill="${ST_COL[estado(c)]}" stroke="#1E2B2F" stroke-width="${u * .6}"/>`; }
+  if (cur){ const [x, y] = W0(cur.lon, cur.lat);
+    t += `<circle cx="${x}" cy="${y}" r="${u * 8}" fill="none" stroke="#1E2B2F" stroke-opacity=".6" stroke-width="${u * 4}"/>
+          <circle cx="${x}" cy="${y}" r="${u * 8}" fill="none" stroke="#F2D24B" stroke-width="${u * 2.2}"/>
+          <path d="M${x - u*14} ${y}h${u*5}M${x + u*9} ${y}h${u*5}M${x} ${y - u*14}v${u*5}M${x} ${y + u*9}v${u*5}" stroke="#F2D24B" stroke-width="${u * 2}"/>`; }
+  g.innerHTML = t;
+}
+
+/* Exportar */
+function download(name, text, type){
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type})); a.download = name;
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+const fname = ext => `candidatos_${D.meta.sitio.replace(/[^\wáéíóúñ]+/gi, '_')}_${new Date().toISOString().slice(0,10)}.${ext}`;
+function props(c){
+  const v = VAL[c.seed] || {};
+  return {id: c.rank, lon: +c.lon.toFixed(6), lat: +c.lat.toFixed(6), n_pixeles: c.n_px, area_m2: c.area_m2, area_ha: +c.area_ha.toFixed(4),
+    ndvi_mean: +c.ndvi_mean.toFixed(4), ndvi_max: +c.ndvi_max.toFixed(4), slope_mean: +c.slope_mean.toFixed(1), susc_dom: c.susc_dom,
+    compacidad: +c.compacidad.toFixed(4), en_inventario: c.en_inventario, validacion: estado(c), nota: v.nota || '', config: cfgLabel()};
+}
+$('#vCsv').onclick = () => {
+  if (!order.length) return;
+  const rows = CL.list.slice().sort((a, b) => a.rank - b.rank).map(props), keys = Object.keys(rows[0]);
+  const q = x => typeof x === 'string' && /[",\n]/.test(x) ? '"' + x.replace(/"/g, '""') + '"' : x;
+  download(fname('csv'), [keys.join(','), ...rows.map(r => keys.map(k => q(r[k])).join(','))].join('\n'), 'text/csv');
+};
+$('#vGeo').onclick = () => {
+  if (!order.length) return;
+  const [lonMin, latMin, lonMax, latMax] = D.meta.bounds, pl = (lonMax - lonMin) / D.w, pa = (latMax - latMin) / D.h;
+  const feats = CL.list.slice().sort((a, b) => a.rank - b.rank).map(c => {
+    const polys = Engine.vectorize(c.px, D.w).map(P => P.map(r => r.map(([x, y]) => [+(lonMin + x * pl).toFixed(7), +(latMax - y * pa).toFixed(7)])));
+    return {type:'Feature', properties: props(c), geometry: {type:'MultiPolygon', coordinates: polys}};
+  });
+  download(fname('geojson'), JSON.stringify({type:'FeatureCollection', name:'candidatos', crs:{type:'name', properties:{name:'urn:ogc:def:crs:OGC:1.3:CRS84'}}, features: feats}), 'application/geo+json');
+};
+
+
+function applyView(){
+  $('#stage').style.transform = `translate(${view.x}px,${view.y}px) scale(${view.k})`;
+  $('#vec').style.setProperty('--sw', (1 / view.k) + 'px');
+  if (G){ updateScale(); clearTimeout(tileTimer); tileTimer = setTimeout(updateDetailTiles, 220); }
+}
+function fitView(){
+  const W = vp.clientWidth, H = vp.clientHeight;
+  view.k = Math.min(W / D.w, H / D.h) * 0.96;
+  view.x = (W - D.w * view.k) / 2; view.y = (H - D.h * view.k) / 2; applyView();
+}
+function centerOn(r, c, k){
+  const W = vp.clientWidth, H = vp.clientHeight;
+  view.k = Math.max(view.k, k); view.x = W/2 - (c + .5) * view.k; view.y = H/2 - (r + .5) * view.k; applyView();
+}
+$('#fit').onclick = fitView;
+window.addEventListener('resize', () => { if (D){ fitView(); const c = curCand(); if (c) drawOrtho(c); } });
+vp.addEventListener('wheel', e => {
+  e.preventDefault();
+  const r = vp.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+  const f = Math.exp(-e.deltaY * 0.0015), k2 = Math.min(40, Math.max(0.3, view.k * f));
+  view.x = mx - (mx - view.x) * (k2 / view.k); view.y = my - (my - view.y) * (k2 / view.k); view.k = k2; applyView();
+}, {passive:false});
+let drag = null;
+vp.addEventListener('mousedown', e => { drag = {x:e.clientX, y:e.clientY, vx:view.x, vy:view.y}; vp.classList.add('drag'); });
+window.addEventListener('mouseup', e => {
+  if (drag && D && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 4){
+    const r = cv.getBoundingClientRect();
+    const c = Math.floor((e.clientX - r.left) / r.width * D.w), rr = Math.floor((e.clientY - r.top) / r.height * D.h);
+    if (c >= 0 && c < D.w && rr >= 0 && rr < D.h){
+      const id = CL.labels[rr * D.w + c];
+      if (id >= 0){ const k = order.findIndex(o => o.id === id); if (k >= 0) selectCand(k); }
+    }
+  }
+  drag = null; vp.classList.remove('drag');
+});
+window.addEventListener('mousemove', e => {
+  if (drag){ view.x = drag.vx + e.clientX - drag.x; view.y = drag.vy + e.clientY - drag.y; applyView(); }
+});
+const tip = $('#tip');
+vp.addEventListener('mousemove', e => {
+  if (!D || drag){ tip.style.display = 'none'; return; }
+  const r = cv.getBoundingClientRect();
+  const c = Math.floor((e.clientX - r.left) / r.width * D.w), rr = Math.floor((e.clientY - r.top) / r.height * D.h);
+  if (c < 0 || c >= D.w || rr < 0 || rr >= D.h){ tip.style.display = 'none'; return; }
+  const i = rr * D.w + c, fin = stages[stages.length - 1];
+  let estado;
+  if (fin.mask[i]) estado = '<b>Detectado</b>';
+  else if (!stages[0].mask[i]) estado = 'Bajo el umbral base';
+  else { const s = stages.find(s => !s.mask[i]); estado = 'Descartado por ' + (FILTERS.find(f => f.key === s.key) || {name:s.key}).name; }
+  const lv = D.meta.niveles_susc.filter((_, b) => D.susc_bits[i] & (1 << b)).join(', ') || '–';
+  const n = v => Number.isNaN(v) ? '–' : v.toFixed(3);
+  tip.innerHTML = `${estado}${D.inv[i] ? '  (en inventario)' : ''}<br>ΔNDVI ${n(D.ndvi[i])}   ΔBSI ${n(D.bsi[i])}<br>Pendiente ${Number.isNaN(D.slope[i]) ? '–' : D.slope[i].toFixed(1) + '°'}   Curv. ${n(D.curv[i])}<br>Susc. ${lv}`;
+  tip.style.display = 'block'; tip.style.left = (e.clientX + 14) + 'px'; tip.style.top = (e.clientY + 14) + 'px';
+});
+vp.addEventListener('mouseleave', () => { tip.style.display = 'none'; $('#coord').textContent = ''; });
+vp.addEventListener('mousemove', e => {
+  if (!G) return;
+  const r = cv.getBoundingClientRect(), c = (e.clientX - r.left) / r.width * D.w, rr = (e.clientY - r.top) / r.height * D.h;
+  $('#coord').textContent = c >= 0 && c < D.w && rr >= 0 && rr < D.h ? `${(G.latMax - rr * G.pa).toFixed(5)}°, ${(G.lonMin + c * G.pl).toFixed(5)}°` : '';
+});
+</script>
+<!--CAPAS_EMBEBIDAS-->
+<script>
+if (window.CAPAS){
+  $('#loadmsg').textContent = 'Cargando capas incluidas…';
+  setTimeout(() => { try { start(window.CAPAS); } catch (e){ $('#loadmsg').textContent = 'Error al cargar las capas incluidas: ' + e.message; } }, 30);
+}
+</script>
+</body>
+</html>
