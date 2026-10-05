@@ -25,25 +25,25 @@ h1,h2,h3{color:var(--pri);font-weight:800;letter-spacing:-.01em}
 .card-s{background:var(--white);border-radius:var(--r);box-shadow:var(--shadow)}
 :focus-visible{outline:2px solid var(--pri);outline-offset:2px}
 
-/* Cabecera institucional */
-.hdr{display:flex;align-items:center;gap:22px;padding:14px 26px;position:sticky;top:10px;z-index:30}
+/* Cabecera institucional + barra de municipios: fijas, rectas, a todo el ancho */
+.topbar{position:sticky;top:0;z-index:50;box-shadow:0 2px 10px rgba(0,0,0,.12)}
+.hdr{display:flex;align-items:center;gap:22px;padding:12px 52px;background:#fff;border-top:4px solid var(--pri)}
 .brand{display:flex;align-items:center;gap:16px;text-decoration:none}
-.logo-sama{height:52px;width:auto;display:block}
-.wordmark{font:900 34px/1 var(--sans);color:var(--pri);letter-spacing:.02em}
-.hdr-title{border-left:1px solid var(--line);padding-left:18px}
+.logo-sama{height:62px;width:auto;display:block}
+.wordmark{font:900 40px/1 var(--sans);color:var(--pri);letter-spacing:.02em}
+.hdr-title{border-left:1px solid var(--line);padding-left:20px}
 .kicker{display:block;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
-.hdr h1{font-size:21px;margin:2px 0 0;font-weight:800}
-.logo-inst{height:46px;width:auto;display:block}
+.hdr h1{font-size:20px;margin:2px 0 0;font-weight:800}
+.logo-inst{height:64px;width:auto;display:block}
 .inst-txt{font-size:12px;font-weight:700;color:var(--pri);text-align:right;line-height:1.3}
-
-/* Barra de municipios */
-.mbar{background:var(--pri);color:#fff;border-radius:var(--r);box-shadow:var(--shadow);padding:10px 14px 10px 22px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
-.mlabel{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--acc)}
-.tabs{display:flex;gap:8px;flex-wrap:wrap}
-.tab{border:1.5px solid rgba(255,255,255,.35);background:transparent;color:#fff;border-radius:var(--r);padding:7px 18px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px}
-.tab:hover{background:rgba(168,212,234,.18)}
-.tab.active{background:var(--acc);border-color:var(--acc);color:var(--pri)}
-.tab svg{width:16px;height:16px}
+.mbar{background:var(--pri);color:#fff;padding:0 40px 0 52px;display:flex;align-items:stretch;gap:10px;min-height:56px;flex-wrap:wrap}
+.mlabel{align-self:center;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--acc);margin-right:10px}
+.tabs{display:flex;gap:4px;flex-wrap:wrap}
+.tab{border:0;border-bottom:3px solid transparent;background:transparent;color:#fff;padding:0 22px;font-size:17px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:8px}
+.tab:hover{background:rgba(168,212,234,.12)}
+.tab.active{border-bottom-color:var(--acc);font-weight:700}
+.tab svg{width:16px;height:16px;opacity:.85}
+.mbar .btn{align-self:center}
 .btn{display:inline-flex;align-items:center;gap:7px;padding:8px 18px;border:1.5px solid var(--pri);border-radius:var(--r);background:var(--pri);color:#fff;cursor:pointer;font-weight:600;font-size:13.5px}
 .btn:hover{background:#0B3366}
 .btn.ghost{background:#fff;color:var(--pri);border-color:var(--line)}
@@ -191,7 +191,7 @@ td .x{border:0;background:none;color:var(--muted);cursor:pointer;padding:0 2px;f
 #fnList li.sel{background:var(--acc);box-shadow:inset 3px 0 0 var(--pri);font-weight:600}
 
 /* Validador */
-#valid{scroll-margin-top:110px;margin-top:18px;background:var(--surf);border-radius:var(--r);padding:20px 20px 24px}
+#valid{scroll-margin-top:160px;margin-top:18px;background:var(--surf);border-radius:var(--r);padding:20px 20px 24px}
 .vhead{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:6px}
 .vhead h2{font-size:20px;margin:0}
 .vcounts{display:flex;gap:14px;font-size:12.5px;font-variant-numeric:tabular-nums}
@@ -245,14 +245,14 @@ footer{display:flex;gap:16px;justify-content:space-between;flex-wrap:wrap;font-s
 @media (max-width:1150px){
   main{grid-template-columns:1fr;height:auto}#mapcol{height:75vh}
   .vbody{grid-template-columns:1fr}.vpanels{grid-template-columns:1fr 1fr}.vpanels figure.big{grid-column:1/-1;grid-row:auto}
-  .hdr{flex-wrap:wrap;position:static}.hdr-title{border:0;padding:0}
+  .hdr{flex-wrap:wrap;padding:10px 18px}.hdr-title{border:0;padding:0}.mbar{padding:0 14px}.topbar{position:static}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body>
-<div class="page">
-<header class="hdr card-s">
+<div class="topbar">
+<header class="hdr">
   <a class="brand" href="#" aria-label="SAMA - Sistema de Alerta y Monitoreo de Antioquia">
     <img class="logo-sama" alt="SAMA - Sistema de Alerta y Monitoreo de Antioquia"
          src="assets/sama_logo.svg" data-remote="https://eamontoyaa.github.io/sama-monitoring/assets/sama_logo.svg" data-text="SAMA">
@@ -274,6 +274,8 @@ footer{display:flex;gap:16px;justify-content:space-between;flex-wrap:wrap;font-s
   <label class="btn light"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></svg>Abrir capas<input id="file" type="file" accept=".json,.gz" hidden></label>
 </nav>
 
+</div>
+<div class="page">
 <section class="content card-s">
   <div class="phead">
     <div>
@@ -716,7 +718,9 @@ document.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if (
 function init(){
   const M = D.meta;
   $('#app').classList.remove('empty');
-  $('#ttl').textContent = M.sitio;
+  const st = (typeof SITIOS !== 'undefined' && SITIOS.find(x => x.id === sitioActivo)) || null;
+  D.nombre = (st && st.evento) || String(M.sitio).replace(/^Cisneros\s*[–-]\s*/i, '');
+  $('#ttl').textContent = D.nombre;
   $('#sub').textContent = `Pre ${M.pre[0]} a ${M.pre[1]}   |   Post ${M.post[0]} a ${M.post[1]}   |   ${D.nEv} eventos ≥ ${M.area_min_m2} m²`;
   for (const p of [90, 95, 99]) baseMetrics[p] = rawBase(p);
   buildStack(); buildBg(); fitView();
@@ -1302,7 +1306,7 @@ function download(name, text, type){
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type})); a.download = name;
   document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
 }
-const fname = ext => `candidatos_${D.meta.sitio.replace(/[^\wáéíóúñ]+/gi, '_')}_${new Date().toISOString().slice(0,10)}.${ext}`;
+const fname = ext => `candidatos_${D.nombre.replace(/[^\wáéíóúñ]+/gi, '_')}_${new Date().toISOString().slice(0,10)}.${ext}`;
 function props(c){
   const v = VAL[c.seed] || {};
   return {id: c.rank, lon: +c.lon.toFixed(6), lat: +c.lat.toFixed(6), n_pixeles: c.n_px, area_m2: c.area_m2, area_ha: +c.area_ha.toFixed(4),
@@ -1393,7 +1397,7 @@ vp.addEventListener('mousemove', e => {
    Para agregar uno: corre el notebook de ese sitio (celdas 17 y 20), sube su .json.gz
    junto a esta página y añade una línea aquí. */
 const SITIOS = [
-  {id: 'santo-domingo', nombre: 'Santo Domingo', capas: 'capas.json.gz'},
+  {id: 'santo-domingo', nombre: 'Santo Domingo', evento: 'Santo Domingo 2021', capas: 'capas.json.gz'},
   // {id: 'girardota', nombre: 'Girardota', capas: 'capas_girardota.json.gz'},
 ];
 
