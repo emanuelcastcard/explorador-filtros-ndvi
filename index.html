@@ -555,7 +555,7 @@ footer{display:flex;gap:16px;justify-content:space-between;flex-wrap:wrap;font-s
       bsi: {on:true, p:d.pct_bsi},
       slope: {on:true, t:d.slope},
       curv: {on:true, p:d.curv_pct},
-      susc: {on:true, levels:d.susc.slice()},
+      susc: {on:(M.niveles_presentes || []).length > 0, levels:d.susc.slice()},
       ndviFinal: {on:false, p:d.pct_ndvi_final > 0 ? d.pct_ndvi_final : 95},
       dbscan: {on:false, eps:d.dbscan_eps, min:d.dbscan_min},
     };
@@ -721,7 +721,7 @@ function init(){
   const st = (typeof SITIOS !== 'undefined' && SITIOS.find(x => x.id === sitioActivo)) || null;
   D.nombre = (st && st.evento) || String(M.sitio).replace(/^Cisneros\s*[–-]\s*/i, '');
   $('#ttl').textContent = D.nombre;
-  $('#sub').textContent = `Pre ${M.pre[0]} a ${M.pre[1]}   |   Post ${M.post[0]} a ${M.post[1]}   |   ${D.nEv} eventos ≥ ${M.area_min_m2} m²`;
+  $('#sub').textContent = `${M.fecha_evento ? 'Evento ' + M.fecha_evento + '   |   ' : ''}Pre ${M.pre[0]} a ${M.pre[1]}   |   Post ${M.post[0]} a ${M.post[1]}   |   ${D.nEv} eventos ≥ ${M.area_min_m2} m²`;
   for (const p of [90, 95, 99]) baseMetrics[p] = rawBase(p);
   buildStack(); buildBg(); fitView();
   checkReference();
@@ -741,14 +741,14 @@ function checkReference(){
   const st = Engine.run(D, Engine.defaultCfg(D.meta));
   const got = {ndvi_p90: baseMetrics[90] || rawBase(90)};
   for (const s of st) got[s.key] = s.m;
-  const bad = [];
+  const bad = []; let n = 0;
   for (const k of Object.keys(ref)){
-    const g = got[k]; if (!g) continue;
+    const g = got[k]; if (!g) continue; n++;
     if (g.px !== ref[k].px || g.TP !== ref[k].TP) bad.push(`${k}: ${fmt(g.px)} px/${g.TP} TP vs notebook ${fmt(ref[k].px)}/${ref[k].TP}`);
   }
   el.className = bad.length ? 'bad' : 'ok';
   el.textContent = bad.length ? 'Difiere del notebook en ' + bad.join('; ')
-                              : `Reproduce el notebook en las ${Object.keys(ref).length} etapas de referencia`;
+                              : `Reproduce el notebook en las ${n} etapas de referencia`;
 }
 
 /* Tarjetas de umbral base */
@@ -797,7 +797,10 @@ function buildStack(){
       rangeCtl(P, 0, 45, 1, c.t, v => { c.t = v; }, v => `> ${v}°`);
     } else if (F.key === 'curv'){
       rangeCtl(P, 50, 100, 1, c.p, v => { c.p = v; }, v => `≤ P${v}`);
-      if (!D.meta.curv_desde_dem) P.insertAdjacentHTML('afterend', '<div class="note">Calculada sobre la pendiente: el DEM no se encontró en el notebook.</div>');
+      if (!D.meta.curv_desde_dem) P.insertAdjacentHTML('afterend', '<div class="note">Laplaciano de la pendiente (mismo método en todos los sitios).</div>');
+    } else if (F.key === 'susc' && !(D.meta.niveles_presentes || []).length){
+      tog.disabled = true; tog.checked = false;
+      P.innerHTML = `<span class="note" style="margin:0">${D.meta.susc_nota || 'Este sitio no tiene capa de susceptibilidad.'}</span>`;
     } else if (F.key === 'susc'){
       P.innerHTML = D.meta.niveles_presentes.map(lv => `<label class="chk"><input type="checkbox" value="${lv}" ${c.levels.includes(lv) ? 'checked' : ''}>${lv}</label>`).join('');
       P.querySelectorAll('input').forEach(i => i.onchange = () => {
@@ -1397,8 +1400,9 @@ vp.addEventListener('mousemove', e => {
    Para agregar uno: corre el notebook de ese sitio (celdas 17 y 20), sube su .json.gz
    junto a esta página y añade una línea aquí. */
 const SITIOS = [
-  {id: 'santo-domingo', nombre: 'Santo Domingo', evento: 'Santo Domingo 2021', capas: 'capas.json.gz'},
-  // {id: 'girardota', nombre: 'Girardota', capas: 'capas_girardota.json.gz'},
+  {id: 'santo-domingo', nombre: 'Santo Domingo', evento: 'Santo Domingo 2021',          capas: 'capas.json.gz'},
+  {id: 'venecia',       nombre: 'Venecia',       evento: 'Venecia – Cerro Bravo 2024',  capas: 'capas_venecia.json.gz'},
+  {id: 'jerico',        nombre: 'Jericó',        evento: 'Jericó 2019',                 capas: 'capas_jerico.json.gz'},
 ];
 
 /* Logos: copia local en assets/, si no la del sitio SAMA, si no texto */
@@ -1441,16 +1445,29 @@ async function fetchCapas(name){
   status('Preparando capas…');
   return JSON.parse(new TextDecoder().decode(buf));
 }
+let cargaId = 0;
 async function loadSite(st){
   if (!st) return;
+  const previo = sitioActivo, yo = ++cargaId;
   sitioActivo = st.id; renderSites();
-  const u = new URL(location.href); u.searchParams.set('sitio', st.id); u.searchParams.delete('capas'); history.replaceState(null, '', u);
   if (location.protocol === 'file:'){ status('Abierto como archivo local: usa “Abrir capas” o arrastra el .json aquí.'); return; }
   try {
     status(`Descargando capas de ${st.nombre}…`);
     const data = await fetchCapas(st.capas);
-    setTimeout(() => { try { start(data); } catch (e){ status('Error al cargar las capas: ' + e.message); } }, 30);
-  } catch (e){ status(`No se pudieron cargar las capas de ${st.nombre}: ${e.message}. Puedes usar “Abrir capas”.`); }
+    if (yo !== cargaId) return;                               // el usuario ya eligió otro municipio
+    setTimeout(() => {
+      try {
+        start(data);
+        if (st.id){ const u = new URL(location.href); u.searchParams.set('sitio', st.id); u.searchParams.delete('capas'); history.replaceState(null, '', u); }
+      } catch (e){ status('Error al cargar las capas: ' + e.message); }
+    }, 30);
+  } catch (e){
+    if (yo !== cargaId) return;
+    if (D){ sitioActivo = previo; renderSites(); }
+    const falta = /HTTP 404/.test(e.message);
+    status(falta ? `Las capas de ${st.nombre} aún no están publicadas (falta ${st.capas} en el repositorio).`
+                 : `No se pudieron cargar las capas de ${st.nombre}: ${e.message}. Puedes usar “Abrir capas”.`);
+  }
 }
 
 
